@@ -534,6 +534,10 @@ header .hacts .sep{width:1px;height:18px;background:var(--line-2);margin:0 3px}
   border-right:1px solid var(--line);background:var(--bg-2)}
 #noteLeft #noteList{width:auto;flex:1;min-height:0;border-right:none;background:transparent}
 
+/* 笔记列表的「读取中」行：形状跟真实的一条笔记一致，不做方块骨架 */
+.note-load{display:flex;align-items:center;gap:7px;padding:14px 14px;color:var(--fg-3);
+  font-size:12px;border-bottom:1px solid rgba(34,39,46,.6)}
+
 .note{display:flex;gap:9px;padding:11px 14px;cursor:pointer;
   border-bottom:1px solid rgba(34,39,46,.6);position:relative;transition:background .12s var(--ease)}
 .note:hover{background:var(--surface)}
@@ -593,7 +597,7 @@ header .hacts .sep{width:1px;height:18px;background:var(--line-2);margin:0 3px}
 #noteEdit .esingle{flex:1;min-height:0;overflow:auto;padding:0}
 #noteEdit #neBody{max-width:860px;margin:0 auto;padding:20px 40px 90px;
   outline:none;font-size:14px;line-height:1.85;color:#d7dde4;word-break:break-word}
-#noteEdit #neBody:empty:before{content:attr(data-ph);color:var(--fg-4)}
+#noteEdit #neBody:empty:before{content:attr(data-ph);color:rgba(235,238,245,.30);font-size:15.5px}
 #noteEdit #neBody h1{font-size:23px;margin:20px 0 10px;font-weight:650;line-height:1.4;color:#fff}
 #noteEdit #neBody h2{font-size:18.5px;margin:18px 0 8px;font-weight:600;line-height:1.45;color:#fff}
 #noteEdit #neBody h3{font-size:15.5px;margin:15px 0 6px;font-weight:600;color:#fff}
@@ -774,6 +778,10 @@ header .hacts .sep{width:1px;height:18px;background:var(--line-2);margin:0 3px}
 .sk-lines{padding:22px;display:flex;flex-direction:column;gap:12px}
 .sk-lines .sk{height:44px;border-radius:var(--r-sm)}
 .sk-hd{height:14px;width:180px;margin:0 22px 4px}
+/* 列表页首次加载的占位行：外面是真实行的盒子（.item / .todo / .dcard），
+   里面只放会呼吸的 .sk 块，行高和内容位置跟加载完的样子一致，不会整块跳。 */
+.skrow{pointer-events:none;user-select:none}
+.skrow .bx,.skrow .ic,.skrow .dic{opacity:.5}
 
 /* ---------- 新建弹窗 ---------- */
 #modal{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;
@@ -1414,9 +1422,8 @@ header .hacts{gap:8px}
 .rise{animation:rise .2s var(--ease)}
 /* ---------- 窄窗口 ---------- */
 @media (max-width:1120px){
-  /* 侧栏宽度交给用户拖动（--side-w），这里不再强制收窄；左右两栏统一 240 */
-  #left{width:240px;flex-basis:240px}
-  #noteLeft{width:240px;flex-basis:240px}
+  /* 侧栏宽度交给用户拖动（--side-w），列表宽度也统一交给 --panel-w */
+  #left,#noteLeft{width:var(--panel-w);flex:0 0 var(--panel-w)}
   .grid{grid-template-columns:repeat(auto-fill,minmax(132px,1fr))}
   .player{width:150px}
 }
@@ -1548,9 +1555,814 @@ header .hacts{gap:8px}
 #crumb .vsw button.on{background:var(--ctl-lite),rgba(40,48,58,.55);border:1px solid var(--ctl-line);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.20)}
 
+/* =====================================================================
+   Apple Glass · 2026-11-24
+   这次只做「观感与交互层」：不改数据结构、不改接口、不改业务路径。
+   目标：macOS Tahoe / iOS 26 的深色 Liquid Glass——
+   透光但不糊、圆润但不软、层次清楚、动效有回弹、文字对比度优先。
+   ===================================================================== */
+
+/* ---------- 1. 设计变量 ---------- */
+:root{
+  --bg:#070910;
+  --bg-2:#0b0e16;
+  --surface:rgba(24,29,40,.62);
+  --surface-2:rgba(34,40,54,.68);
+  --surface-3:rgba(46,53,69,.74);
+  --surface-4:rgba(58,66,83,.80);
+  --line:rgba(255,255,255,.07);
+  --line-2:rgba(255,255,255,.11);
+  --line-3:rgba(255,255,255,.18);
+  --fg:#f5f5f7;
+  --fg-2:rgba(235,235,245,.67);
+  --fg-3:rgba(235,235,245,.49);
+  --fg-4:rgba(235,235,245,.33);
+  --accent:#0a84ff;
+  --accent-hover:#409cff;
+  --accent-weak:rgba(10,132,255,.14);
+  --accent-line:rgba(10,132,255,.45);
+  --ok:#30d158;
+  --warn:#ff9f0a;
+  --danger:#ff453a;
+  --danger-weak:rgba(255,69,58,.13);
+  --r-xs:8px; --r-sm:10px; --r-md:14px; --r-lg:18px; --r-xl:24px;
+  --h-ctl:32px;
+  --shadow-1:0 1px 2px rgba(0,0,0,.24);
+  --shadow-2:0 14px 32px -16px rgba(0,0,0,.64),0 3px 8px rgba(0,0,0,.24);
+  --shadow-3:0 36px 90px -28px rgba(0,0,0,.82),0 10px 28px rgba(0,0,0,.34);
+  --glass-1:rgba(17,22,31,.64);
+  --glass-2:rgba(24,30,41,.74);
+  --glass-3:rgba(33,40,53,.84);
+  --glass-line:rgba(255,255,255,.09);
+  --glass-hi:rgba(255,255,255,.15);
+  --blur-1:26px; --blur-2:36px; --blur-3:50px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text",
+    "Segoe UI","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+  --font-display:"SF Pro Display","Segoe UI Variable Display","Segoe UI",
+    "Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+  --mono:"SF Mono","Cascadia Mono","Cascadia Code",Consolas,"Microsoft YaHei",monospace;
+  --ease:cubic-bezier(.22,1,.36,1);
+  --ease-out:cubic-bezier(.16,1,.3,1);
+  --dur-1:.14s; --dur-2:.22s; --dur-3:.32s; --dur-4:.46s;
+}
+
+body{
+  font:13.5px/1.62 var(--font);
+  letter-spacing:-.006em;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+h1,h2,h3,.mbox h3,#login h3,.gate h3{font-family:var(--font-display);}
+
+/* ---------- 2. 墙纸：玻璃要透出一点颜色，才不是一块灰板 ---------- */
+#ambient{
+  background:
+    radial-gradient(1200px 860px at 84% -18%, rgba(10,132,255,.20), transparent 64%),
+    radial-gradient(920px 720px at -12% 40%, rgba(94,92,230,.13), transparent 68%),
+    radial-gradient(820px 620px at 20% 108%, rgba(48,209,88,.065), transparent 64%),
+    radial-gradient(680px 520px at 56% 44%, rgba(255,55,95,.045), transparent 70%),
+    linear-gradient(158deg,#070910 0%,#0a0f18 46%,#06080e 100%);
+}
+#ambient .a1{width:780px;height:780px;right:-210px;top:-300px;
+  background:radial-gradient(circle,rgba(10,132,255,.18),rgba(10,132,255,0) 68%)}
+#ambient .a2{width:660px;height:660px;left:-220px;bottom:-280px;
+  background:radial-gradient(circle,rgba(120,90,255,.17),rgba(120,90,255,0) 68%)}
+#ambient .a3{width:560px;height:560px;left:36%;top:30%;
+  background:radial-gradient(circle,rgba(48,209,88,.09),rgba(48,209,88,0) 70%)}
+/* 极轻的胶片颗粒；只叠在最底层，不挡字 */
+#ambient::after{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.035;mix-blend-mode:soft-light;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.6'/%3E%3C/svg%3E");
+  background-size:180px 180px;
+}
+#side,main{position:relative;z-index:1}
+
+/* ---------- 3. 侧栏：一块悬浮的玻璃，而不是一条黑边 ---------- */
+#side{
+  padding:14px 8px 12px;
+  background:linear-gradient(180deg,rgba(22,27,38,.78) 0%,rgba(12,16,24,.64) 56%,rgba(9,12,19,.60) 100%);
+  border-right:1px solid rgba(255,255,255,.065);
+  -webkit-backdrop-filter:blur(38px) saturate(180%);
+  backdrop-filter:blur(38px) saturate(180%);
+  box-shadow:inset -1px 0 0 rgba(255,255,255,.035),20px 0 60px -58px rgba(0,0,0,.95);
+}
+#brand{
+  display:flex;align-items:center;gap:9px;padding:5px 9px 17px;
+  position:relative;z-index:1;user-select:none;flex:none;
+}
+#brand .mark{
+  width:30px;height:30px;border-radius:10px;display:grid;place-items:center;flex:none;
+  background:linear-gradient(155deg,#63b3ff 0%,#0a84ff 46%,#0057c8 100%);
+  border:1px solid rgba(160,205,255,.40);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 -1px 0 rgba(0,40,110,.32),
+    0 5px 14px -6px rgba(0,110,255,.55);
+  color:#fff;
+}
+#brand .mark svg.i{width:16px;height:16px;stroke-width:1.7;color:#fff}
+#brand .word{font-family:var(--font-display);font-size:14px;font-weight:650;
+  letter-spacing:-.025em;color:var(--fg);white-space:nowrap;flex:none}
+#brand .ver{font-size:9px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--fg-4);padding:3px 6px;border:1px solid rgba(255,255,255,.08);
+  border-radius:6px;background:rgba(255,255,255,.03);margin-left:auto}
+#side > .nav:first-of-type{margin-top:2px}
+
+.nav{
+  height:40px;padding:0 11px;margin:2px 6px;border-radius:12px;gap:11px;
+  font-size:13.5px;font-weight:500;color:var(--fg-2);
+  transition:background var(--dur-2) var(--ease-out),color var(--dur-2) var(--ease-out);
+}
+.nav svg.i{width:18px;height:18px;color:var(--fg-3);stroke-width:1.7;
+  transition:color var(--dur-2) var(--ease-out),transform var(--dur-3) var(--ease-out)}
+.nav:hover{background:rgba(255,255,255,.055);color:var(--fg)}
+.nav:hover svg.i{color:var(--fg-2)}
+.nav.on{background:transparent;color:#fff;font-weight:650}
+.nav.on svg.i{color:#59a8ff;stroke-width:2}
+#navPill{
+  left:6px;right:6px;height:40px;border-radius:12px;
+  background:linear-gradient(180deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,.065) 54%,rgba(255,255,255,.025) 100%);
+  border:1px solid rgba(255,255,255,.13);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(0,0,0,.28),
+    0 10px 24px -18px rgba(0,0,0,.85);
+  -webkit-backdrop-filter:blur(22px) saturate(180%);
+  backdrop-filter:blur(22px) saturate(180%);
+}
+
+#side .foot{border-top:1px solid rgba(255,255,255,.07);padding:12px 4px 2px}
+#side .me{
+  height:44px;padding:6px 8px;border-radius:14px;
+  background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.035));
+  border:1px solid rgba(255,255,255,.075);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+}
+#side .me:hover{background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.05));
+  border-color:rgba(255,255,255,.12)}
+#side .meava{width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,255,255,.14);
+  box-shadow:0 2px 8px rgba(0,0,0,.28)}
+#side .mename{font-size:12.5px;color:var(--fg-2)}
+#side .megear{width:28px;height:28px;border-radius:8px}
+.cachebtn{height:30px;border-radius:10px;font-size:11.5px;color:var(--fg-3)}
+
+/* ---------- 4. 顶栏：一条轻柔的工具条 ---------- */
+header{
+  height:54px;flex:0 0 54px;padding:0 20px 0 24px;gap:12px;
+  background:linear-gradient(180deg,rgba(15,19,28,.80),rgba(10,14,21,.62));
+  border-bottom:1px solid rgba(255,255,255,.07);
+  -webkit-backdrop-filter:blur(36px) saturate(180%);
+  backdrop-filter:blur(36px) saturate(180%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 14px 38px -34px rgba(0,0,0,.9);
+}
+header h1{font-size:17px;font-weight:650;letter-spacing:-.025em;line-height:1.2}
+header .htitle{gap:10px;align-items:center}
+header .sub{font-size:12px;color:var(--fg-3);letter-spacing:.01em}
+header .parent{font-size:12px}
+header .hacts{gap:8px}
+header .hacts .sep{height:20px;background:rgba(255,255,255,.08);margin:0 4px}
+header #btnNew,header #btnTrash{height:32px;padding:0 14px;border-radius:10px}
+header #btnNew{min-width:0}
+.iconbtn{width:32px;height:32px;border-radius:10px;color:var(--fg-2)}
+.btn.sm{height:30px;border-radius:10px}
+.btn.xs{height:26px;border-radius:8px}
+.btn{height:32px;border-radius:10px;font-size:12.5px}
+.btn.primary{background:linear-gradient(180deg,#4aa6ff 0%,#0a84ff 52%,#0068d9 100%);
+  border-color:rgba(130,195,255,.62);color:#fff;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.38),0 5px 16px -8px rgba(0,105,255,.65)}
+.btn.primary:hover{background:linear-gradient(180deg,#64b4ff 0%,#1c92ff 52%,#0075ee 100%);
+  border-color:rgba(160,210,255,.75);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.46),0 8px 22px -10px rgba(0,120,255,.72)}
+.btn.primary:active{background:linear-gradient(180deg,#248fff,#0066d6);transform:scale(.975)}
+.btn.outline{background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.045));
+  border-color:rgba(255,255,255,.14)}
+.btn.outline:hover{background:linear-gradient(180deg,rgba(255,255,255,.15),rgba(255,255,255,.07));
+  border-color:rgba(255,255,255,.22)}
+.btn.ghost{color:var(--fg-2)}
+.iconbtn{background:linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,.035));
+  border:1px solid rgba(255,255,255,.11);box-shadow:inset 0 1px 0 rgba(255,255,255,.10)}
+.iconbtn:hover{background:linear-gradient(180deg,rgba(255,255,255,.15),rgba(255,255,255,.06));
+  border-color:rgba(255,255,255,.20);color:#fff}
+
+/* ---------- 5. 左右栏：同样的玻璃，不同的密度 ---------- */
+#left,#noteLeft{
+  background:linear-gradient(180deg,rgba(17,22,31,.56),rgba(12,16,24,.50));
+  border-right:1px solid rgba(255,255,255,.065);
+  -webkit-backdrop-filter:blur(28px) saturate(160%);
+  backdrop-filter:blur(28px) saturate(160%);
+}
+#left{padding:10px 0 12px}
+#noteLeft{border-right-color:rgba(255,255,255,.075)}
+#noteReader{background:linear-gradient(180deg,rgba(8,11,17,.28),rgba(8,11,17,.46))}
+#noteEdit .ehead,#noteEdit .etools{background:rgba(14,18,27,.64);
+  -webkit-backdrop-filter:blur(26px) saturate(170%);
+  backdrop-filter:blur(26px) saturate(170%)}
+.nhead{background:rgba(14,18,27,.68);border-bottom:1px solid rgba(255,255,255,.065);
+  -webkit-backdrop-filter:blur(26px) saturate(170%);
+  backdrop-filter:blur(26px) saturate(170%)}
+
+.sect{padding:18px 14px 8px;font-size:10.5px;font-weight:650;letter-spacing:.10em;
+  color:var(--fg-4)}
+.row{
+  height:38px;margin:1px 8px;padding:0 10px;border-radius:10px;
+  transition:background var(--dur-2) var(--ease-out),color var(--dur-2) var(--ease-out),
+    box-shadow var(--dur-2) var(--ease-out);
+}
+.row:hover{background:rgba(255,255,255,.055)}
+.row.on{
+  background:linear-gradient(90deg,rgba(10,132,255,.18),rgba(10,132,255,.055));
+  box-shadow:inset 0 0 0 1px rgba(10,132,255,.18);
+}
+.row.on::before{left:0;top:10px;bottom:10px;width:2px;background:#3da2ff;border-radius:2px}
+.row .nm{font-size:13.5px;color:var(--fg-2)}
+.row.on .nm{color:#fff;font-weight:600}
+.row .ct{font-size:11px;color:var(--fg-4)}
+.row.on .ct{color:rgba(235,235,245,.58)}
+.row.sec .nm{font-size:14.5px;font-weight:650;letter-spacing:-.015em}
+.row.alb{padding-left:36px}
+.row.alb .nm{font-size:13px}
+.row.sec > .i{width:16px;height:16px}
+.sect + .row.sec{margin-top:2px}
+.foldh{height:28px;color:var(--fg-4);border-radius:8px}
+.foldh:hover{background:rgba(255,255,255,.04);color:var(--fg-2)}
+.cachebtn{background:transparent;border-color:transparent}
+.cachebtn:hover{background:rgba(255,255,255,.055);border-color:rgba(255,255,255,.09)}
+
+/* ---------- 6. 相册：照片是主角，卡片只做很轻的托底 ---------- */
+#tl{top:68px;right:12px;width:38px;color:rgba(235,235,245,.45)}
+#tl .tick .yr{color:rgba(235,235,245,.42);font-size:10px}
+#tl .tick i{background:rgba(255,255,255,.28);width:8px}
+#tl .tick.has i{background:rgba(255,255,255,.44)}
+#tl .tick.hv i{background:#5eb1ff;width:12px}
+#tl .tick.on i{background:#0a84ff;width:14px}
+#tl .tick.on .yr{color:#64b5ff}
+#tl .poscur{background:#0a84ff;box-shadow:0 0 12px rgba(10,132,255,.5)}
+
+#content .day{padding:26px 22px 0;padding-right:66px}
+.dayh{
+  top:12px;display:inline-flex;align-items:center;gap:8px;
+  padding:8px 12px 9px;margin:6px 0 8px;border-radius:99px;
+  font-size:14px;font-weight:650;letter-spacing:-.015em;color:rgba(245,245,247,.94);
+  background:linear-gradient(180deg,rgba(23,29,40,.80),rgba(12,17,26,.68));
+  border:1px solid rgba(255,255,255,.09);
+  -webkit-backdrop-filter:blur(22px) saturate(135%);
+  backdrop-filter:blur(22px) saturate(135%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 8px 22px -16px rgba(0,0,0,.9);
+}
+.dayh .n{
+  padding:2px 8px;border-radius:99px;background:rgba(255,255,255,.075);
+  border:1px solid rgba(255,255,255,.09);color:var(--fg-3);font-size:10.5px;
+}
+.grid{gap:14px;padding-bottom:14px}
+.card{
+  border-radius:16px;border:1px solid rgba(255,255,255,.055);
+  background:rgba(255,255,255,.035);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 1px 2px rgba(0,0,0,.22);
+  transition:transform var(--dur-3) var(--ease-out),box-shadow var(--dur-3) var(--ease-out),
+    border-color var(--dur-2) var(--ease-out);
+}
+.card:hover{
+  transform:translateY(-3px) scale(1.012);
+  border-color:rgba(255,255,255,.12);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 20px 44px -20px rgba(0,0,0,.85),
+    0 6px 14px rgba(0,0,0,.30);
+}
+.card:active{transform:translateY(-1px) scale(.992)}
+.card img{
+  opacity:0;filter:blur(8px);transform:scale(1.035);
+  transition:opacity var(--dur-4) var(--ease-out),filter var(--dur-4) var(--ease-out),
+    transform var(--dur-4) var(--ease-out);
+}
+.card img.ready{opacity:1;filter:blur(0);transform:scale(1)}
+.card.skc{background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.025));
+  border-color:rgba(255,255,255,.06);animation:skPulse 1.8s ease-in-out infinite}
+.card .ph{
+  background:linear-gradient(100deg,rgba(255,255,255,.035) 25%,rgba(255,255,255,.10) 45%,rgba(255,255,255,.035) 65%);
+  background-size:220% 100%;
+}
+.card .tick{
+  left:10px;top:10px;width:22px;height:22px;border-radius:50%;
+  background:rgba(20,22,26,.34);border:1.5px solid rgba(255,255,255,.75);
+  -webkit-backdrop-filter:blur(12px) saturate(160%);
+  backdrop-filter:blur(12px) saturate(160%);
+  box-shadow:0 2px 8px rgba(0,0,0,.28);
+}
+.card .tick svg{width:11px;height:11px}
+.card.sel .tick{background:#0a84ff;border-color:rgba(255,255,255,.92);
+  box-shadow:0 2px 10px rgba(0,50,130,.5)}
+.card.sel{
+  box-shadow:0 0 0 3px #0a84ff,0 20px 44px -18px rgba(0,0,0,.85);
+  border-color:transparent;
+}
+.card .meta{
+  padding:18px 12px 9px;font-size:11px;color:rgba(245,245,247,.88);
+  background:linear-gradient(transparent,rgba(5,7,11,.72));
+}
+.card .vt{
+  right:10px;top:10px;border-radius:99px;background:rgba(18,20,26,.58);
+  border-color:rgba(255,255,255,.12);font-size:10.5px;
+  -webkit-backdrop-filter:blur(12px) saturate(160%);backdrop-filter:blur(12px) saturate(160%);
+}
+
+/* ---------- 7. 列表：先用标准列表，不要每行都做成大卡片 ---------- */
+#content > .lists{max-width:1180px;margin:0 auto;padding:8px 0 28px}
+#crumb{height:48px;padding:0 20px;background:rgba(15,19,28,.62);
+  border-bottom:1px solid rgba(255,255,255,.06);
+  -webkit-backdrop-filter:blur(24px) saturate(160%);
+  backdrop-filter:blur(24px) saturate(160%)}
+#crumb a{padding:4px 8px;border-radius:8px}
+#crumb a.cur{color:var(--fg);font-weight:600}
+#crumb .vsw{border-radius:10px;background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.08);padding:2px}
+#crumb .vsw button{width:28px;height:24px;border-radius:7px}
+.item{
+  min-height:64px;margin:2px 12px;padding:11px 14px;border-radius:13px;
+  border-bottom:none;transition:background var(--dur-2) var(--ease-out),
+    box-shadow var(--dur-2) var(--ease-out);
+}
+.item:hover{background:rgba(255,255,255,.055);box-shadow:inset 0 0 0 1px rgba(255,255,255,.055)}
+.item.sel{background:rgba(10,132,255,.12);box-shadow:inset 0 0 0 1px rgba(10,132,255,.22)}
+.item.sel::before{width:2px;background:#3da2ff}
+.item .ic{width:38px;height:38px;border-radius:12px;
+  background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.04));
+  border:1px solid rgba(255,255,255,.075);box-shadow:inset 0 1px 0 rgba(255,255,255,.09)}
+.item .t1{font-size:14px;font-weight:500;letter-spacing:-.01em}
+.item .t2{font-size:11.5px;margin-top:4px;color:var(--fg-3)}
+.item .rt svg.i{width:16px;height:16px;color:var(--fg-3)}
+.player{width:238px;gap:10px}
+.player .pp{width:30px;height:30px;border-radius:50%;
+  background:linear-gradient(180deg,rgba(255,255,255,.15),rgba(255,255,255,.055));
+  border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.16)}
+.player .pp:hover{background:linear-gradient(180deg,rgba(255,255,255,.23),rgba(255,255,255,.09))}
+.player .bar{height:4px;border-radius:99px;background:rgba(255,255,255,.10)}
+.player .bar i{border-radius:99px;background:#4aa6ff;box-shadow:0 0 10px rgba(10,132,255,.35)}
+.player .tm{font-size:10.5px;color:var(--fg-4);min-width:34px}
+#driveList.grid{gap:14px;padding:16px 18px 28px}
+.dcard{
+  border-radius:16px;padding:14px;background:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,.04));
+  border:1px solid rgba(255,255,255,.075);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 1px 2px rgba(0,0,0,.18);
+}
+.dcard:hover{background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.055));
+  border-color:rgba(255,255,255,.14);box-shadow:0 18px 36px -20px rgba(0,0,0,.8)}
+.dcard .dic{width:38px;height:38px;border-radius:12px}
+
+/* ---------- 8. 笔记：左栏是索引卡，右栏是真正的阅读纸面 ---------- */
+#noteLeft{width:300px;flex:0 0 300px}
+#noteList{width:auto;flex:1;min-height:0;background:transparent}
+.nhead{padding:10px 12px 11px;min-height:0}
+.notefilter{gap:6px;max-height:none;overflow:visible;padding:0}
+.chip{height:28px;border-radius:99px;padding:0 11px;font-size:12px;
+  background:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,.035));
+  border-color:rgba(255,255,255,.09);box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.chip:hover{background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.055));
+  border-color:rgba(255,255,255,.16);color:#fff}
+.chip.on{background:linear-gradient(180deg,rgba(10,132,255,.34),rgba(10,132,255,.16));
+  border-color:rgba(90,170,255,.45);color:#e6f1ff}
+.chip.on em{color:rgba(190,220,255,.82)}
+.note{margin:2px 10px;padding:11px 12px;border-radius:12px;
+  border-bottom:none;transition:background var(--dur-2) var(--ease-out),
+    box-shadow var(--dur-2) var(--ease-out)}
+.note:hover{background:rgba(255,255,255,.055)}
+.note.on{background:linear-gradient(90deg,rgba(10,132,255,.17),rgba(10,132,255,.055));
+  box-shadow:inset 0 0 0 1px rgba(10,132,255,.18)}
+.note.on::before{left:0;top:11px;bottom:11px;width:2px;background:#3da2ff}
+.note.sel{background:rgba(10,132,255,.14)}
+.note .ti{font-size:14px;font-weight:600;letter-spacing:-.012em}
+.note .dt{font-size:10.5px;color:var(--fg-4);font-weight:400}
+.note .pv{font-size:12px;line-height:1.65;color:var(--fg-3);margin-top:5px}
+.note .ncb{width:20px;height:20px;border-radius:50%;border-color:rgba(255,255,255,.28)}
+.note.sel .ncb{background:#0a84ff;border-color:rgba(255,255,255,.9)}
+.note-load{padding:15px 16px;color:var(--fg-3);font-size:12px;border-bottom:none}
+#notePad{padding:44px 52px 52px;max-width:820px}
+#notePad .nrow{gap:16px;margin:0 0 24px;align-items:flex-start}
+#notePad h2{font-size:28px;font-weight:700;line-height:1.28;letter-spacing:-.035em}
+#notePad .nacts .btn{height:30px;border-radius:9px}
+#noteMeta{
+  padding:11px 40px;border-top:1px solid rgba(255,255,255,.065);
+  background:rgba(10,13,20,.72);color:var(--fg-4);font-size:11px;
+  -webkit-backdrop-filter:blur(28px) saturate(170%);
+  backdrop-filter:blur(28px) saturate(170%);
+  box-shadow:0 -12px 28px -26px rgba(0,0,0,.9)
+}
+.mdbody{font-size:15.5px;line-height:1.96;letter-spacing:.005em;color:rgba(240,243,248,.88)}
+.mdbody p{margin:0 0 12px}
+.mdbody .mdh{margin:26px 0 10px;color:#fff;letter-spacing:-.025em}
+.mdbody h1.mdh{font-size:22px}
+.mdbody h2.mdh{font-size:19px}
+.mdbody h3.mdh{font-size:16.5px}
+.mdbody blockquote{margin:14px 0;padding:12px 16px;border-left:2px solid rgba(10,132,255,.55);
+  background:rgba(10,132,255,.075);border-radius:0 12px 12px 0;color:rgba(235,240,248,.82)}
+.mdbody .mdpre{background:rgba(0,0,0,.28);border-color:rgba(255,255,255,.08);border-radius:12px}
+.mdbody .mdimg{border-radius:12px}
+.mdbody .mdlink{color:#64b5ff;border-bottom-color:rgba(100,181,255,.35)}
+#noteEdit .ehead{padding-top:12px;padding-bottom:12px}
+#noteEdit .ehead input{font-size:22px;font-weight:700;letter-spacing:-.03em}
+#noteEdit .etools{padding-top:8px;padding-bottom:8px;gap:5px}
+#noteEdit .etools button{height:28px;border-radius:8px}
+#noteEdit #neBody{max-width:820px;padding:28px 52px 100px;font-size:15.5px;line-height:1.95;
+  color:rgba(240,243,248,.88)}
+#noteEdit #neBody h1{font-size:24px;letter-spacing:-.03em}
+#noteEdit #neBody h2{font-size:19px;letter-spacing:-.02em}
+#noteEdit #neBody blockquote{border-radius:0 12px 12px 0;background:rgba(10,132,255,.075);
+  border-left-color:rgba(10,132,255,.55);padding:11px 16px}
+#noteEdit #neBody pre{border-radius:12px;background:rgba(0,0,0,.28)}
+#noteEdit #neBody img{border-radius:12px}
+
+/* ---------- 9. 代办：圆形勾选 + 轻玻璃卡片 ---------- */
+#todoWrap{max-width:880px;padding:8px 0 64px}
+#todoBody{gap:10px;margin:0 18px}
+.todo{
+  padding:14px 16px;border-radius:16px;
+  background:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,.035));
+  border:1px solid rgba(255,255,255,.075);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 1px 2px rgba(0,0,0,.20);
+  transition:background var(--dur-2) var(--ease-out),border-color var(--dur-2) var(--ease-out),
+    transform var(--dur-3) var(--ease-out),box-shadow var(--dur-3) var(--ease-out);
+}
+.todo:hover{background:linear-gradient(180deg,rgba(255,255,255,.115),rgba(255,255,255,.05));
+  border-color:rgba(255,255,255,.13);transform:translateY(-2px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 18px 38px -22px rgba(0,0,0,.8)}
+.todo:active{transform:translateY(-1px) scale(.997)}
+.todo .bx{
+  width:22px;height:22px;border-radius:50%;border:1.5px solid rgba(255,255,255,.30);
+  background:rgba(255,255,255,.045);box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+}
+.todo .bx:hover{border-color:#4aa6ff;background:rgba(10,132,255,.12);box-shadow:0 0 0 4px rgba(10,132,255,.10)}
+.todo.done .bx{background:linear-gradient(180deg,#49df7a,#22b94c);border-color:rgba(105,240,150,.65);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 0 0 4px rgba(48,209,88,.08)}
+.todo .bx svg{width:11px;height:11px;stroke-width:3.2}
+.todo .tx{font-size:14.5px;line-height:1.58;letter-spacing:-.008em}
+.todo.done .tx > .ttl{color:var(--fg-3)}
+.todo .sub{margin-top:10px;gap:7px}
+.todo .sub div{font-size:12.5px;line-height:1.6}
+.todo .sub div .sdot{width:14px;height:14px;border-radius:50%;border-color:rgba(255,255,255,.24)}
+.todo .sub div.s .sdot{background:linear-gradient(180deg,#49df7a,#22b94c);border-color:rgba(105,240,150,.6)}
+.todo .dt{font-size:11px;color:var(--fg-4);min-width:46px;margin-top:4px;margin-right:8px}
+.todo .acts{opacity:.34;margin-top:0;gap:3px}
+.todo .acts button{width:28px;height:28px;border-radius:8px;
+  background:transparent;border:1px solid transparent}
+.todo .acts button:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.14)}
+.todoSplit{margin:26px 18px 12px;font-size:11px;color:var(--fg-4);letter-spacing:.06em}
+#todoPager{height:46px;margin:20px 18px 0;padding:0 16px;border-radius:14px;
+  background:rgba(17,22,31,.62);border-color:rgba(255,255,255,.08);
+  -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+#todoPager .pg,#todoPager .pgbtn{height:28px;border-radius:8px}
+
+/* ---------- 10. 弹窗 / 设置：厚玻璃 + 大圆角 + iOS 分组 ---------- */
+#modal,#confirm,#picker,.ovl{background:rgba(3,5,9,.48);
+  -webkit-backdrop-filter:blur(28px) saturate(120%);
+  backdrop-filter:blur(28px) saturate(120%)}
+.mbox,.cbox,#picker .pbox,#vInfoPanel,#ctx,#dlbar,#login .box,#viewerLoading .vbox{
+  background:linear-gradient(180deg,rgba(42,48,63,.84),rgba(27,33,45,.86));
+  border:1px solid rgba(255,255,255,.10);
+  -webkit-backdrop-filter:blur(48px) saturate(180%);
+  backdrop-filter:blur(48px) saturate(180%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 0 0 .5px rgba(0,0,0,.3),var(--shadow-3);
+}
+.mbox{width:600px;max-width:92vw;padding:24px;border-radius:26px;gap:14px;
+  animation:appleSheet .36s var(--ease-out)}
+.mbox::before{content:"";display:block;width:38px;height:4px;border-radius:99px;
+  margin:-10px auto 2px;background:rgba(255,255,255,.20)}
+.mbox h3{font-size:17px;font-weight:650;letter-spacing:-.025em}
+.mbox input,.mbox textarea,.cbox .cin,.cbox .srow select,.cbox .srow input{
+  background:rgba(0,0,0,.24);border:1px solid rgba(255,255,255,.10);
+  border-radius:12px;color:var(--fg);font-size:13.5px;box-shadow:inset 0 1px 2px rgba(0,0,0,.22)}
+.mbox input,.cbox .cin{height:40px;padding:0 12px}
+.mbox textarea{height:260px;padding:12px;line-height:1.75}
+.mbox input:focus,.mbox textarea:focus,.cbox .cin:focus{
+  border-color:rgba(10,132,255,.55);
+  box-shadow:0 0 0 3px rgba(10,132,255,.14),inset 0 1px 2px rgba(0,0,0,.22)}
+.mtools{gap:4px;padding:2px 0}
+.mtools button{height:28px;border-radius:8px;color:var(--fg-2)}
+.mtools button:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.13);color:#fff}
+.mact{justify-content:flex-end;gap:9px;margin-top:4px}
+.mact .btn{height:34px;border-radius:10px;padding:0 16px}
+.cbox{width:420px;padding:24px;border-radius:24px;gap:16px;animation:appleSheet .32s var(--ease-out)}
+.cbox p{font-size:13.5px;line-height:1.75;color:rgba(240,243,248,.82)}
+.cbox .ctitle{font-size:14px;font-weight:650}
+.cbox .cin{height:40px}
+.cbox.wide{width:600px;padding:24px;border-radius:26px}
+.cbox .csec{margin:20px 0 7px;font-size:11.5px;font-weight:600;letter-spacing:.02em;
+  color:rgba(235,238,245,.52)}
+.clist{border-radius:12px;border:1px solid rgba(255,255,255,.075);background:rgba(0,0,0,.19);flex:none}
+.crow{height:42px;padding:0 14px;border-bottom:1px solid rgba(255,255,255,.055);font-size:12.5px}
+.crow.tot{background:rgba(255,255,255,.04);color:rgba(245,245,247,.88)}
+.cbox.wide > *{flex:none}
+.cbox .srow{height:40px;margin:8px 0}
+.cbox .srow .cn{width:70px;color:rgba(235,238,245,.70);font-size:12.5px}
+.cbox .srow select,.cbox .srow input{height:34px;padding:0 10px;font-size:12.5px}
+.cbox .snote{font-size:11.5px;line-height:1.7;color:rgba(235,238,245,.46)}
+.cbox.wide{padding-bottom:0}
+.cbox.wide .mact{
+  position:sticky;bottom:0;z-index:6;margin:14px -24px 0;padding:14px 24px 20px;
+  background:linear-gradient(180deg,rgba(26,32,44,.72),rgba(19,25,36,.96));
+  -webkit-backdrop-filter:blur(24px) saturate(150%);
+  backdrop-filter:blur(24px) saturate(150%);
+  border-top:1px solid rgba(255,255,255,.08);
+  box-shadow:0 -16px 32px -26px rgba(0,0,0,.9)}
+.cbox .acct{gap:14px;margin:14px 0 8px;padding:12px;border-radius:14px;
+  background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.065)}
+.cbox .ava{width:48px;height:48px;border-radius:50%;border-color:rgba(255,255,255,.12)}
+.cbox .an b{font-size:14px}
+#confirm .cbox .mact{justify-content:flex-end}
+#confirm .cbox .btn{height:34px;border-radius:10px}
+
+/* ---------- 11. 查看器：把工具浮起来，让图片落在暗场里 ---------- */
+#viewer{
+  background:rgba(0,0,0,.58);
+  -webkit-backdrop-filter:blur(46px) saturate(115%);
+  backdrop-filter:blur(46px) saturate(115%);
+}
+#viewer .top{
+  position:absolute;left:18px;right:18px;top:16px;z-index:10;height:54px;
+  padding:0 10px 0 18px;border-radius:16px;
+  background:linear-gradient(180deg,rgba(30,35,48,.72),rgba(15,19,28,.66));
+  border:1px solid rgba(255,255,255,.10);
+  -webkit-backdrop-filter:blur(34px) saturate(180%);
+  backdrop-filter:blur(34px) saturate(180%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 18px 44px -24px rgba(0,0,0,.85);
+}
+#viewer .top .nm{font-size:14px;font-weight:600;letter-spacing:-.015em}
+#viewer .top .mt{font-size:11px;color:var(--fg-3)}
+#viewer .top .btn.ghost{height:30px;border-radius:9px;background:rgba(255,255,255,.055);
+  border:1px solid rgba(255,255,255,.09);color:rgba(240,243,248,.82)}
+#viewer .top .btn.ghost:hover{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.18);color:#fff}
+#vClose{width:30px;height:30px;padding:0;border-radius:50% !important}
+#viewer img.vimg{border-radius:6px;box-shadow:0 40px 100px -30px rgba(0,0,0,.9)}
+#viewer .nav{
+  width:44px;height:56px;border-radius:14px;
+  background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.055));
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 16px 38px -22px rgba(0,0,0,.9)
+}
+#viewer .nav:hover{background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,.08))}
+#viewer .zoom{
+  bottom:22px;padding:5px 6px;border-radius:99px;
+  background:linear-gradient(180deg,rgba(30,35,48,.76),rgba(15,19,28,.70));
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.13),0 16px 38px -22px rgba(0,0,0,.9)
+}
+#viewer .zoom button{height:30px}
+#viewer .zoom button:hover{background:rgba(255,255,255,.14)}
+#viewer .tip{color:rgba(235,235,245,.34);font-size:10.5px}
+#viewer .vchip{top:84px;background:rgba(24,29,40,.72);border-color:rgba(255,255,255,.10);
+  border-radius:99px;box-shadow:0 8px 22px -12px rgba(0,0,0,.8)}
+#viewerLoading .vbox{width:min(460px,78vw);padding:30px 30px 24px;border-radius:24px}
+#viewerLoading .vttl{font-size:15px}
+#vInfoPanel{top:82px;right:24px;width:344px;border-radius:20px}
+#vInfoPanel .ihd{padding:13px 16px;border-bottom-color:rgba(255,255,255,.07)}
+#vInfoPanel .ibody{padding:10px 16px 14px}
+#vInfoPanel .irow{padding:9px 0;font-size:12px}
+#vInfoPanel .ifoot{padding:0 16px 16px}
+
+/* ---------- 12. 浮动层 / Toast / 登录 ---------- */
+#selbar{
+  bottom:22px;height:52px;padding:7px 9px 7px 18px;border-radius:99px;
+  background:linear-gradient(180deg,rgba(42,48,63,.86),rgba(22,28,39,.82));
+  border:1px solid rgba(255,255,255,.12);
+  -webkit-backdrop-filter:blur(34px) saturate(180%);
+  backdrop-filter:blur(34px) saturate(180%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 18px 44px -18px rgba(0,0,0,.9)
+}
+#selbar .cnt{font-size:13px}
+#selbar .btn{height:32px;border-radius:9px}
+#toast{
+  bottom:92px;padding:9px 16px;border-radius:99px;
+  max-width:min(520px,calc(100% - 32px));text-align:center;line-height:1.45;
+  background:linear-gradient(180deg,rgba(36,42,55,.74),rgba(18,23,32,.70));
+  border:1px solid rgba(255,255,255,.10);
+  -webkit-backdrop-filter:blur(26px) saturate(170%);
+  backdrop-filter:blur(26px) saturate(170%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 14px 34px -16px rgba(0,0,0,.86);
+  font-size:12.5px;color:rgba(245,245,247,.94)
+}
+#dlbar{border-radius:20px;padding:16px 18px}
+#dropMask .dbox{border-radius:18px;background:linear-gradient(180deg,rgba(42,48,63,.88),rgba(22,28,39,.82));
+  border-color:rgba(10,132,255,.35);box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 20px 50px -20px rgba(0,0,0,.9)}
+#ctx{border-radius:16px;padding:6px;background:linear-gradient(180deg,rgba(42,48,63,.88),rgba(22,28,39,.84))}
+#ctx button{height:34px;border-radius:9px;padding:0 10px}
+#ctx button:hover{background:rgba(255,255,255,.09)}
+#picker .pbox{border-radius:24px}
+#picker .phd{padding:20px 20px 14px;font-size:15px;border-bottom-color:rgba(255,255,255,.07)}
+#picker .plist{padding:8px}
+#picker .pickpath{background:rgba(0,0,0,.14);border-bottom-color:rgba(255,255,255,.06);padding:8px 12px}
+#picker .pft{padding:12px 18px;border-top-color:rgba(255,255,255,.07)}
+.ovl{border-radius:0}
+.ovl .btn{height:34px}
+#login{
+  background:radial-gradient(900px 620px at 50% 22%,rgba(10,132,255,.22),transparent 65%),
+    rgba(4,6,10,.76);
+  -webkit-backdrop-filter:blur(30px) saturate(130%);
+  backdrop-filter:blur(30px) saturate(130%);
+}
+#login .box{
+  width:440px;padding:30px 32px 26px;border-radius:26px;
+  animation:appleSheet .38s var(--ease-out)
+}
+#login .hd{gap:12px}
+#login .ring{width:20px;height:20px;border-color:rgba(255,255,255,.20);border-top-color:#4aa6ff}
+#login h3{font-size:19px;font-weight:650;letter-spacing:-.03em}
+#login .detail{font-size:13px;line-height:1.9;color:var(--fg-2);margin-top:14px}
+#login .prog{height:5px;background:rgba(255,255,255,.10);margin:18px 0 9px}
+#login .prog i{background:linear-gradient(90deg,#0a84ff,#64b5ff);box-shadow:0 0 14px rgba(10,132,255,.45)}
+#login .meta{font-size:11px;color:var(--fg-4)}
+#login .acts{margin-top:20px}
+#login .acts .btn{height:36px;border-radius:11px;padding:0 18px}
+#login .qrbox{border-radius:20px;box-shadow:0 18px 44px -22px rgba(0,0,0,.8)}
+#login .qrbox::after{border-radius:20px;color:#6d7581}
+#login .box{max-width:92vw}
+
+/* ---------- 13. 动效：少而准，有回弹，不拖沓 ---------- */
+@keyframes appleSheet{
+  from{opacity:0;transform:translateY(14px) scale(.96);filter:blur(6px)}
+  to{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}
+}
+@keyframes appleFade{from{opacity:0}to{opacity:1}}
+#viewer{animation:appleFade .32s var(--ease-out)}
+.mbox,.cbox,#picker .pbox,#login .box,.ovl{will-change:transform,opacity}
+.btn,.iconbtn,.chip,.card,.dcard,.todo,.note,.item,.row,.nav{
+  -webkit-tap-highlight-color:transparent;
+}
+.btn:focus-visible,.iconbtn:focus-visible,.chip:focus-visible,.nav:focus-visible,
+.card:focus-visible,.note:focus-visible,.item:focus-visible,.todo:focus-visible{
+  outline:2px solid rgba(74,166,255,.85);outline-offset:2px;
+}
+::selection{background:rgba(10,132,255,.30);color:#fff}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border:3px solid transparent;
+  border-radius:99px;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.28);background-clip:content-box}
+::-webkit-scrollbar-track{background:transparent}
+
+/* 选择控件统一成圆形；相册/代办已经圆了，录音、云盘、笔记也跟齐 */
+.tick2,.note .ncb,.dcard .dtick{
+  width:22px;height:22px;border-radius:50%;
+  border:1.5px solid rgba(255,255,255,.16);
+  background:rgba(255,255,255,.025);
+  transition:background .15s var(--ease-out),border-color .15s var(--ease-out),box-shadow .15s var(--ease-out);
+}
+.tick2 svg,.note .ncb svg,.dcard .dtick svg{width:12px;height:12px;stroke-width:2.8}
+.tick2.on,.note .ncb.on,.dcard .dtick.on{
+  background:linear-gradient(180deg,#2f9bff,#0a84ff);border-color:rgba(255,255,255,.10);color:#fff;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 4px 12px -6px rgba(10,132,255,.8)
+}
+
+/* ---------- 14. 窄窗口：只改密度，不砍功能 ---------- */
+@media (max-width:1120px){
+  #left,#noteLeft{width:var(--panel-w);flex:0 0 var(--panel-w)}
+  header{padding:0 16px 0 20px}
+  #notePad{padding:38px 36px 44px}
+  #noteEdit #neBody{padding:24px 36px 90px}
+  #content .day{padding:24px 22px 0;padding-right:66px}
+  .grid{gap:12px}
+  #content > .lists{max-width:100%}
+}
+@media (max-width:900px){
+  #brand{padding:6px 0 14px;justify-content:center;gap:0}
+  #brand .word,#brand .ver{display:none}
+  #side{padding:12px 6px 10px}
+  .nav{height:42px;margin:2px 2px;padding:0;justify-content:center;border-radius:12px}
+  .nav span{display:none}
+  .nav svg.i{width:19px;height:19px}
+  #navPill{left:2px;right:2px;height:42px}
+  #side .foot{display:block;padding:10px 0 2px;margin-top:auto}
+  #side .me{height:42px;padding:6px 0;justify-content:center}
+  #side .mename,#side .megear{display:none}
+  header{height:52px;flex-basis:52px;padding:0 12px 0 16px}
+  header h1{font-size:15px}
+  header .sub{display:none}
+  header .hacts{gap:6px}
+  #tl{top:64px;right:8px}
+  #content .day{padding:22px 22px 0;padding-right:66px}
+  .dayh{font-size:13px}
+  #notePad{padding:30px 24px 36px}
+  #notePad h2{font-size:24px}
+  #noteEdit .ehead,#noteEdit .etools{padding-left:24px;padding-right:24px}
+  #noteEdit #neBody{padding:22px 24px 80px}
+  #todoWrap{max-width:100%;padding-left:0;padding-right:0}
+  .player{width:190px}
+  #viewer .top{left:10px;right:10px;top:10px;height:50px;padding:0 8px 0 14px}
+  #viewer .top .mt{display:none}
+  #vInfoPanel{top:72px;right:12px;width:320px}
+  #viewer .zoom{bottom:16px}
+}
+
+/* =====================================================================
+   2026-11-24 验收修正：导航同一套、列表可调宽、查看器贴边玻璃、笔记底栏
+   ===================================================================== */
+
+/* ---------- 列表栏可拖宽：与侧栏同一根手柄、同一套反馈 ---------- */
+#body{position:relative}
+#panelGrip{
+  position:absolute;left:calc(var(--panel-w, 260px) - 4px);top:0;bottom:0;width:8px;
+  cursor:col-resize;z-index:24;display:none;
+}
+#panelGrip::after{
+  content:"";position:absolute;top:0;bottom:0;left:3px;width:2px;
+  background:transparent;transition:background var(--dur-2) var(--ease-out);
+}
+#panelGrip:hover::after,#panelGrip.on::after{background:rgba(10,132,255,.75)}
+
+/* ---------- 侧栏导航与页面内导航：同高、同宽、同圆角、同动效 ---------- */
+#navPill{display:none !important}
+.nav{
+  position:relative;height:38px;margin:1px 8px;padding:0 10px;border-radius:10px;
+  transition:background var(--dur-2) var(--ease-out),color var(--dur-2) var(--ease-out),
+    box-shadow var(--dur-2) var(--ease-out);
+}
+.nav:hover{background:rgba(255,255,255,.055);color:var(--fg)}
+.nav.on{
+  background:linear-gradient(90deg,rgba(10,132,255,.18),rgba(10,132,255,.055));
+  box-shadow:inset 0 0 0 1px rgba(10,132,255,.18);color:#fff;font-weight:600;
+}
+.nav.on::before{
+  content:"";position:absolute;left:0;top:10px;bottom:10px;width:2px;
+  background:#3da2ff;border-radius:2px;
+}
+.nav.on svg.i{color:#59a8ff;stroke-width:2}
+
+/* ---------- 卡片/待办：只做边框和阴影，不做位移和缩放 ---------- */
+.card:hover,.dcard:hover,.todo:hover{transform:none}
+.card:active,.dcard:active,.todo:active{transform:none}
+#content .grid{grid-template-columns:repeat(auto-fill,var(--thumb,148px));gap:14px}
+.card img{transition:opacity .22s var(--ease-out),filter .22s var(--ease-out),
+  transform .22s var(--ease-out)}
+
+/* ---------- 笔记分类：固定「全部」在首位，其余按条数降序；等宽网格 ---------- */
+.notefilter{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:6px;
+  padding:10px 12px 12px;max-height:none;overflow:visible;
+}
+.chip{
+  width:100%;min-width:0;height:28px;padding:0 8px;justify-content:center;gap:6px;
+}
+.chip .cn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip em{flex:none}
+
+/* ---------- 代办：空列表/短列表时，分页条也固定在内容区底部 ---------- */
+#todoWrap{min-height:100%;display:flex;flex-direction:column;box-sizing:border-box;padding-bottom:16px}
+#todoBody{flex:1 1 auto;min-height:0}
+#todoBody > .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 20px}
+#todoPager{margin-top:auto}
+
+/* ---------- 笔记阅读：正文滚动，创建/修改/解密固定在窗口底部 ---------- */
+#noteLeft{width:var(--panel-w);flex:0 0 var(--panel-w)}
+#noteReader{display:flex;flex-direction:column;overflow:hidden;min-height:0}
+#noteMeta{
+  flex:none;margin-top:auto;justify-content:flex-start;
+  background:rgba(10,13,20,.58);
+  -webkit-backdrop-filter:blur(28px) saturate(160%);
+  backdrop-filter:blur(28px) saturate(160%);
+}
+
+/* ---------- 查看器：顶栏贴住窗口上沿；所有浮层统一成更透的玻璃 ---------- */
+#viewer{background:rgba(3,4,7,.52)}
+#viewer .top{
+  position:absolute;left:0;right:0;top:0;z-index:12;flex:none;height:52px;
+  padding:0 12px 0 18px;border-radius:0;
+  background:linear-gradient(180deg,rgba(6,10,16,.30),rgba(6,10,16,.04));
+  border:0;border-bottom:1px solid rgba(255,255,255,.07);
+  -webkit-backdrop-filter:none;
+  backdrop-filter:none;
+  box-shadow:none;
+  text-shadow:0 1px 4px rgba(0,0,0,.72),0 0 12px rgba(0,0,0,.30);
+}
+/* 左侧文件名和参数可能压在亮图上：只在这一段加一层很薄的暗角，
+   中间和右侧保持透明，图片细节仍然清楚。 */
+#viewer .top::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:min(50%,620px);
+  background:linear-gradient(90deg,rgba(3,6,10,.50),rgba(3,6,10,.16) 70%,transparent);
+  pointer-events:none;
+}
+#viewer .top > *{position:relative;z-index:1}
+/* 顶栏必须盖在图片舞台之上，背后有内容才透得出来；舞台本身从窗口顶部开始，
+   再用 padding-top 给图片留出 52px 控制栏高度。此前把 top 做成 flex 子项，
+   图片从 52px 才开始，顶栏背后只有纯背景色，所以看起来永远是一块实心黑条。 */
+#viewer .stage{
+  position:absolute;inset:0;flex:none;
+}
+#viewer .top .btn.ghost{
+  background:rgba(8,12,18,.72);border-color:rgba(255,255,255,.18);
+  color:#fff;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 2px 10px rgba(0,0,0,.24);
+}
+#viewer .top .btn.ghost:hover{background:rgba(8,12,18,.86);border-color:rgba(255,255,255,.28);color:#fff}
+#viewer .zoom{
+  bottom:16px;background:rgba(8,12,18,.64);border-color:rgba(255,255,255,.14);
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 10px 26px -14px rgba(0,0,0,.7)
+}
+#viewer .zoom button{color:#f3f6fb;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+#viewer .zoom .pct{color:#dce3ee;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+#viewer .nav{
+  background:rgba(8,12,18,.64);border-color:rgba(255,255,255,.14);
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 8px 22px -12px rgba(0,0,0,.7)
+}
+#viewer .nav:hover{background:rgba(40,48,62,.62);border-color:rgba(255,255,255,.14)}
+#viewer .vchip{top:64px;background:rgba(18,23,33,.50)}
+#vInfoPanel{top:64px;right:18px}
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms !important;animation-iteration-count:1 !important;
-    transition-duration:.001ms !important}
+    transition-duration:.001ms !important;scroll-behavior:auto !important}
 }
 </style>
 </head>
@@ -1633,6 +2445,11 @@ header .hacts{gap:8px}
 
 <aside id="side">
   <span id="navPill" aria-hidden="true"></span>
+  <div id="brand" aria-label="小米云">
+    <span class="mark"><svg class="i"><use href="#i-cloud"/></svg></span>
+    <span class="word">小米云</span>
+    <span class="ver">Cloud</span>
+  </div>
   <div class="nav" data-tab="todo" title="代办"><svg class="i"><use href="#i-todo"/></svg><span>代办</span></div>
   <div class="nav" data-tab="note" title="笔记"><svg class="i"><use href="#i-note"/></svg><span>笔记</span></div>
   <div class="nav on" data-tab="gallery" title="相册"><svg class="i"><use href="#i-photo"/></svg><span>相册</span></div>
@@ -1672,6 +2489,7 @@ header .hacts{gap:8px}
   <div id="body">
     <div id="left"></div>
     <div id="content"><div class="empty"><span class="spinner"></span>加载中 …</div></div>
+    <div id="panelGrip" title="拖动调整列表宽度，双击复位"></div>
   </div>
 </main>
 
@@ -1830,11 +2648,42 @@ const WEEK = ['星期日','星期一','星期二','星期三','星期四','星�
 const fmtDayFull = ms => { const d=new Date(ms); return `${fmtDay(ms)} ${WEEK[d.getDay()]}`; };
 const fmtShort = ms => fmtDate(ms).slice(5, 10);
 
-let toastT=null;
-function toast(msg){
-  const t=$('#toast'); t.textContent=msg; t.classList.add('on');
-  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2200);
+let toastT=null, toastLast='', toastLastAt=0;
+/* Toast 的横向中心跟「当前可见区域」走，不再一律按整个窗口 50%：
+   主界面左边有侧栏（默认 172px，可拖 140–320，窄屏 64px），按窗口居中会偏左；
+   查看器/登录页是全屏，就按它们自己的矩形居中。 */
+function toastAnchorRect(){
+  const v = $('#viewer');
+  if(v && getComputedStyle(v).display !== 'none') return v.getBoundingClientRect();
+  const lg = $('#login');
+  if(lg && getComputedStyle(lg).display !== 'none') return lg.getBoundingClientRect();
+  const c = $('#content');
+  if(c){
+    const r = c.getBoundingClientRect();
+    if(r.width > 0) return r;
+  }
+  return {left: 0, width: window.innerWidth};
 }
+function placeToast(){
+  const t = $('#toast');
+  if(!t) return;
+  const r = toastAnchorRect();
+  t.style.left = Math.round(r.left + r.width / 2) + 'px';
+}
+function toast(msg, opt){
+  msg = String(msg == null ? '' : msg);
+  if(opt && opt.quiet) return;
+  const now = Date.now();
+  /* 同一句话 2 秒内不重复弹；后台轮询/自动刷新用 quiet 直接静默 */
+  if(msg === toastLast && now - toastLastAt < 2000) return;
+  toastLast = msg; toastLastAt = now;
+  const t=$('#toast'); t.textContent=msg; placeToast(); t.classList.add('on');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),1800);
+}
+window.addEventListener('resize', () => {
+  const t = $('#toast');
+  if(t && t.classList.contains('on')) placeToast();
+});
 
 async function api(p, opt){
   const r = await fetch(p, opt);
@@ -1871,6 +2720,7 @@ function fallbackCopy(txt){
 
 let TAB='gallery', sel=new Set();
 const state={items:[],records:[],driveItems:[],notes:[],folders:[],albums:[],videoOnly:false,filling:false,
+             notesAt:0,noteReadAt:{},
              layout:null,todos:null,todoView:null,canSel:false,selHint:'',
              // 云盘视图：list（列表）/ grid（网格）。记住上次的选择
              driveView: (()=>{ try{ return localStorage.getItem('driveView')||'list'; }
@@ -1893,6 +2743,8 @@ const state={items:[],records:[],driveItems:[],notes:[],folders:[],albums:[],vid
     if(!dragging) return;
     const w = Math.max(MIN, Math.min(MAX, startW + (e.clientX - startX)));
     root.style.setProperty('--side-w', w + 'px');
+    const t = $('#toast');
+    if(t && t.classList.contains('on')) placeToast();
   };
   const onUp = () => {
     if(!dragging) return;
@@ -1902,6 +2754,8 @@ const state={items:[],records:[],driveItems:[],notes:[],folders:[],albums:[],vid
     window.removeEventListener('mousemove', onMove);
     window.removeEventListener('mouseup', onUp);
     try{ localStorage.setItem(KEY, String(Math.round(sideW()))); }catch(_){}
+    const t = $('#toast');
+    if(t && t.classList.contains('on')) placeToast();
   };
   g.addEventListener('mousedown', e => {
     e.preventDefault();
@@ -1917,6 +2771,86 @@ const state={items:[],records:[],driveItems:[],notes:[],folders:[],albums:[],vid
   g.addEventListener('dblclick', () => {
     root.style.setProperty('--side-w', '172px');
     try{ localStorage.setItem(KEY, '172'); }catch(_){}
+    const t = $('#toast');
+    if(t && t.classList.contains('on')) placeToast();
+  });
+})();
+
+/* ============ 列表栏拖拽调宽：相册 / 代办 / 笔记共用一根 ============ */
+function syncPanelGrip(){
+  const g = $('#panelGrip');
+  if(!g) return;
+  const left = $('#left');
+  const nl = $('#noteLeft');
+  const leftVisible = left && left.offsetParent !== null && left.getBoundingClientRect().width > 0;
+  const noteVisible = nl && nl.offsetParent !== null && nl.getBoundingClientRect().width > 0;
+  g.style.display = (leftVisible || noteVisible) ? 'block' : 'none';
+  if(noteVisible){
+    const w = nl.getBoundingClientRect().width;
+    g.style.left = Math.max(0, w - 4) + 'px';
+  }else if(leftVisible){
+    const w = left.getBoundingClientRect().width;
+    g.style.left = Math.max(0, w - 4) + 'px';
+  }
+}
+
+(function bindPanelResize(){
+  const MIN = 210, MAX = 420, DEF = 260, KEY = 'panelW';
+  const root = document.documentElement;
+  try{
+    const saved = parseInt(localStorage.getItem(KEY), 10);
+    if(saved >= MIN) root.style.setProperty('--panel-w', Math.min(MAX, saved) + 'px');
+  }catch(_){}
+  const g = $('#panelGrip');
+  if(!g) return;
+  let startX = 0, startW = 0, dragging = false, rzT = 0;
+  const panelW = () => {
+    const nl = $('#noteLeft');
+    if(nl && nl.offsetParent !== null) return nl.getBoundingClientRect().width;
+    const left = $('#left');
+    return left ? left.getBoundingClientRect().width : DEF;
+  };
+  const relayoutGallery = () => {
+    if(TAB === 'gallery' && $('#vpool') && gal.idx) galRelayout();
+  };
+  const onMove = e => {
+    if(!dragging) return;
+    const w = Math.max(MIN, Math.min(MAX, startW + (e.clientX - startX)));
+    root.style.setProperty('--panel-w', w + 'px');
+    g.style.left = Math.max(0, w - 4) + 'px';
+    clearTimeout(rzT);
+    rzT = setTimeout(relayoutGallery, 80);
+  };
+  const onUp = () => {
+    if(!dragging) return;
+    dragging = false;
+    g.classList.remove('on');
+    document.body.classList.remove('resizing');
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+    try{ localStorage.setItem(KEY, String(Math.round(panelW()))); }catch(_){}
+    clearTimeout(rzT);
+    relayoutGallery();
+  };
+  g.addEventListener('mousedown', e => {
+    e.preventDefault();
+    dragging = true;
+    startX = e.clientX;
+    startW = panelW();
+    g.classList.add('on');
+    document.body.classList.add('resizing');
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  });
+  g.addEventListener('dblclick', () => {
+    root.style.setProperty('--panel-w', DEF + 'px');
+    try{ localStorage.setItem(KEY, String(DEF)); }catch(_){}
+    syncPanelGrip();
+    relayoutGallery();
+  });
+  window.addEventListener('resize', () => {
+    clearTimeout(syncPanelGrip._t);
+    syncPanelGrip._t = setTimeout(syncPanelGrip, 60);
   });
 })();
 
@@ -2039,9 +2973,13 @@ async function renderTab(){
   $('#left').style.display=''; $('#left').innerHTML=''; $('#left').classList.remove('gal');
   const c=$('#content');
   c.style.overflow='auto'; c.scrollTop=0; c.onscroll=null;
-  /* 相册不铺骨架屏：保留上一屏，等索引好了直接换，避免「骨架屏 → 预览」的跳变 */
-  if(TAB !== 'gallery') c.innerHTML = skeleton();
+  /* 不再在切页签时统一铺「标题 + 12 个方块」的骨架：
+     那是相册的形状，代办/录音/云盘/笔记都是列表，先闪一下网格再换列表，正是
+     「先骨架、再刷新」的跳变来源。现在各页在 renderXxx 里同步画出自己的真实
+     布局（筛选栏 / 面包屑 / 列表行），只有完全没有数据时才铺同形状的占位行。 */
   sel.clear(); setDl(false);
+  syncPanelGrip();
+  setTimeout(syncPanelGrip, 0);
   showBtn('#btnNew', false);
   showBtn('#btnTrash', false);
   showBtn('#btnSelAll', false);
@@ -2139,8 +3077,8 @@ async function refreshTab(){
       }
     } else if(TAB==='note'){
       const cur = state.noteId;
-      await renderNotes();
-      if(cur && state.notes.some(n=>n.id===cur)) showNote(cur);
+      await renderNotes({fresh:true});      // 手动刷新才同步等云端整表
+      if(cur && state.notes.some(n=>String(n.id)===String(cur))) showNote(cur);
     } else if(TAB==='todo'){
       await renderTodos(true);
     } else if(TAB==='record'){
@@ -2148,7 +3086,6 @@ async function refreshTab(){
     } else if(TAB==='drive'){
       await driveOpen(state.parent||0, state.trail||[]);
     }
-    toast('已刷新');
   }catch(e){
     toast('刷新失败，检查一下网络或登录');
   }finally{
@@ -2204,6 +3141,7 @@ async function deleteNotes(ids){
       await api('/api/note_delete', {method:'POST',
         headers:{'Content-Type':'application/json'}, body:JSON.stringify({ids})});
       state.noteSel.clear();
+      removeNotesLocal(ids);                 // 列表和正文缓存一起清，省一次整表刷新
       $('#noteReader').innerHTML = `<div class="empty"><div class="big2">${ICO('i-note','xl')}</div>已删除</div>`;
       toast('已删除 ' + ids.length + ' 条笔记');
       await renderNotes();
@@ -2359,11 +3297,16 @@ async function submitCreate(){
   try{
     if(createKind==='edit'){
       const nid = $('#modal').dataset.id;
-      await api('/api/note_save', {method:'POST',
+      const r2 = await api('/api/note_save', {method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:nid, title, content:body})});
       closeCreate();
-      await renderNotes();
+      // 刚写的正文直接塞进正文缓存，列表也只改这一条，不必等整表刷新
+      const prev = noteBodyGet(nid) || {};
+      noteBodyPut(nid, Object.assign({}, prev, {id:String(nid), title, content:body,
+        modified:(r2 && r2.modified) || Date.now()}));
+      upsertNoteLocal(Object.assign({id:nid, title, preview:body.trim().slice(0,180)},
+        r2 || {}));
       showNote(nid);
       toast('已保存');
       return;
@@ -2390,8 +3333,12 @@ async function submitCreate(){
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({title, content:body, folder})});
       closeCreate();
-      await renderNotes();
       if(r.id){
+        // 新笔记先在本地列表里出现（哪怕整表接口还在后台翻页）
+        upsertNoteLocal(Object.assign({id:r.id, title, preview:body.trim().slice(0,180),
+                                       content:body, folder}, r), true);
+        noteBodyPut(r.id, {id:String(r.id), title, content:body,
+          created:(r && r.created) || Date.now(), modified:(r && r.modified) || Date.now()});
         if(folder!=='0'){ state.noteView={folder}; drawNoteChips(); drawNoteList(true); }
         showNote(r.id);
       }
@@ -2507,9 +3454,9 @@ async function renderGallery(){
   drawAlbums();
   gal.video = keepVideo;
   const target = keepVideo ? '0' : (keepAlbum ? keepAlbum.id : '0');
-  if(!galIndexFromCache(target)){
-    /* 没有这本相簿的索引缓存：先用相册骨架顶上，等索引回来再画，
-       否则上一页的内容会一直留到接口返回，看起来就是「闪一下旧页面」。 */
+  if(!galMemoPeek(target, keepVideo) && !galIndexFromCache(target)){
+    /* 内存里有这本相簿（索引 + 照片条目）就直接画，不再铺整页骨架；
+       只有这次运行还没打开过、本地也没索引时才给骨架。 */
     $('#content').innerHTML = skeleton();
   }
   if(keepVideo) await loadAlbum('0', {video:true});
@@ -2527,21 +3474,31 @@ async function renderGallery(){
 
 function albumGroups(){
   const lay = state.layout || {};
-  const pos = new Map((lay.order||[]).map((id,i)=>[id,i]));
-  const sorted = state.albums.slice().sort((a,b)=>{
-    const ia = pos.has(a.id) ? pos.get(a.id) : 1e9;
-    const ib = pos.has(b.id) ? pos.get(b.id) : 1e9;
-    return ia - ib;
-  });
-  const foldedSet = new Set(lay.folded || []);
+  /* 相簿 id 可能因为服务端合并而变成 "旧id,新id"；排序表里存的是旧 id。
+     不能只做字符串全等，否则「资料」这种别名相簿会被挤到列表最下面。 */
+  const idKeys = id => String(id == null ? '' : id).split(',')
+    .map(s => s.trim()).filter(Boolean);
+  const pos = new Map();
+  (lay.order || []).forEach((id, i) => idKeys(id).forEach(k => {
+    if(!pos.has(k)) pos.set(k, i);
+  }));
+  const sortPos = a => {
+    let best = 1e9;
+    idKeys(a.id).forEach(k => { if(pos.has(k)) best = Math.min(best, pos.get(k)); });
+    return best;
+  };
+  const sorted = state.albums.slice().sort((a,b) => sortPos(a) - sortPos(b));
+  const foldedSet = new Set();
+  (lay.folded || []).forEach(id => idKeys(id).forEach(k => foldedSet.add(k)));
+  const isFolded = a => idKeys(a.id).some(k => foldedSet.has(k));
   // 真正的回收站是删除列表接口，不在这份相簿里；这里只防御服务端万一真的返回一本叫回收站的
   const isTrash = a => /^回收站$/.test(a.name || '');
   const isSys = a => String(a.id) === '1' || String(a.id) === '2';   // 相机 / 截屏
   const sys = sorted.filter(isSys).sort((a,b)=>Number(a.id)-Number(b.id));
   const rest = sorted.filter(a=>!isSys(a) && !isTrash(a));
   // 相机、截屏固定在最上面，不参与折叠/拖动排序
-  return {normal: sys.concat(rest.filter(a=>!foldedSet.has(a.id))),
-          folded: rest.filter(a=>foldedSet.has(a.id))};
+  return {normal: sys.concat(rest.filter(a=>!isFolded(a))),
+          folded: rest.filter(isFolded)};
 }
 
 function allAlbumIds(){
@@ -2858,12 +3815,49 @@ const gal = {
 const ymdOf = ms => { const d = new Date(ms); return '' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()); };
 const ymkOf = (y, m) => y + '-' + pad(m);
 
+/* 相册照片条目缓存（只在这次运行内，用户选的 A 方案）：
+   按「相簿 + 照片/视频」存已经取到的 dayItems / items / order / ranges。
+   切走再切回时直接贴真卡片，不用每个日期先铺 .card.skc 骨架再等 /api/items。 */
+const GAL_MEMO = new Map();
+const GAL_MEMO_MAX = 12;          // 最多留 12 本，按最近使用淘汰
+function galMemoKey(id, video){ return String(id) + (video ? '|video' : '|photo'); }
+function galMemoPeek(id, video){
+  const v = (video === undefined) ? !!gal.video : !!video;
+  return GAL_MEMO.get(galMemoKey(id, v)) || null;
+}
+function galMemoTouch(){
+  if(gal.album == null || !gal.idx || !gal.idx.days || !gal.idx.days.length) return;
+  GAL_MEMO.set(galMemoKey(gal.album, gal.video), {
+    idx: gal.idx, dayItems: gal.dayItems, items: gal.items,
+    order: gal.order, ranges: gal.ranges, at: Date.now(),
+  });
+  if(GAL_MEMO.size > GAL_MEMO_MAX){
+    let oldest = null, oldAt = Infinity;
+    GAL_MEMO.forEach((v, k) => { if((v.at || 0) < oldAt){ oldAt = v.at || 0; oldest = k; } });
+    if(oldest) GAL_MEMO.delete(oldest);
+  }
+}
+
+/* 把某一天缓存里的照片直接贴进网格；返回 false 表示这天还没缓存过 */
+function galFillDay(el, ymd){
+  if(!el || !gal.dayItems) return false;
+  const arr = gal.dayItems.get(ymd);
+  if(!arr || !arr.length) return false;
+  const grid = el.querySelector('.grid');
+  if(!grid) return false;
+  grid.innerHTML = arr.map(it => cardHTML(it)).join('');
+  const cnt = el.querySelector('.dayh .n');
+  if(cnt) cnt.textContent = arr.length + ' 项';
+  gal.filled.add(ymd);
+  return true;
+}
+
 /* 量一次几何：一天块 = 固定开销(base) + 行数 × 行高(rowH)
    用真实 DOM 探针量，CSS 改了不用回来改常量 */
 function galMeasure(){
   const c = $('#content');
   const thumb = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--thumb')) || 148;
-  const gap = 10;
+  const gap = 14;
   const usable = Math.max(140, (c.clientWidth || 900) - 88);   // .day 左右内边距 22 / 66
   const perRow = Math.max(1, Math.floor((usable + gap) / (thumb + gap)));
   let rowH = thumb + gap, base = 56;
@@ -2907,6 +3901,47 @@ function galIndexFromCache(albumId){
     if(o && o.days && o.days.length && Date.now() - (o.at || 0) < 6 * 3600 * 1000) return o;
   }catch(e){}
   return null;
+}
+
+/* 相簿索引后台核对：先用本地 6 小时缓存秒开，再悄悄拉一次月份统计。
+   只有「日期或张数真的变了」才重画，正常情况一次请求就结束，画面不动。 */
+async function revalidateGalIndex(id, seq){
+  if(TAB !== 'gallery' || gal.seq !== seq || !gal.idx) return;
+  let d;
+  try{
+    d = await api('/api/gallery_months?album=' + encodeURIComponent(id)
+                  + (gal.video ? '&video=1' : ''));
+  }catch(e){
+    return;                                  // 网络抖动就保持缓存画面
+  }
+  if(TAB !== 'gallery' || gal.seq !== seq || String(gal.album) !== String(id)) return;
+  const idx = galIndexBuild(d);
+  const old = gal.idx;
+  let same = !!(old && old.days.length === idx.days.length);
+  if(same){
+    for(let i = 0; i < idx.days.length; i++){
+      if(idx.days[i].ymd !== old.days[i].ymd || idx.days[i].n !== old.days[i].n){ same = false; break; }
+    }
+  }
+  if(same) return;
+  const c = $('#content');
+  const top = c.scrollTop;
+  try{ localStorage.setItem('galidx:v2:' + id + (gal.video ? ':video' : ''), JSON.stringify(idx)); }catch(_){}
+  /* 只把「张数变了」的日期丢掉重取，其它日期已经缓存的照片继续贴回去，
+     不再整本清空重画（那样切回相册又要闪一遍骨架）。 */
+  const oldN = new Map((old.days || []).map(d => [d.ymd, d.n]));
+  for(const d of idx.days){
+    if(oldN.get(d.ymd) !== d.n) gal.dayItems.delete(d.ymd);
+  }
+  gal.idx = idx;
+  gal.filled = new Set();
+  gal.ranges = [];               // 允许 galWindow 重新补可见区间；已有 dayItems 的日期直接贴真卡片
+  galLayout();
+  galPaint();
+  c.scrollTop = top;
+  galWindow();
+  buildTimeline();
+  galMemoTouch();
 }
 
 async function galGetIndex(albumId, fresh){
@@ -3030,10 +4065,15 @@ function galWindow(){
   const D = gal.idx.days;
   const pool = $('#vpool');
   let gapStart = -1, gapEnd = -1;
+  let filledAny = false;
   for(let i = i0; i <= i1; i++){
     const d = D[i];
-    if(!gal.filled.has(d.ymd) && pool)
-      galSkeletonDay(pool.querySelector(`.day[data-ymd="${d.ymd}"]`), d.n);
+    if(!gal.filled.has(d.ymd) && pool){
+      const el = pool.querySelector(`.day[data-ymd="${d.ymd}"]`);
+      /* 有缓存就先贴真卡片，没有才铺占位卡：这是「切回相册不闪骨架」的关键 */
+      if(galFillDay(el, d.ymd)) filledAny = true;
+      else galSkeletonDay(el, d.n);
+    }
     if(!galCovered(d.ymd)){
       if(gapStart < 0) gapStart = i;
       gapEnd = i;
@@ -3041,6 +4081,7 @@ function galWindow(){
       break;                        // 一次只补一个空洞，补完再找下一个
     }
   }
+  if(filledAny) bindCards();
   if(gapStart < 0) return;
   // 索引是日期倒序的：gapStart 的日期更新、gapEnd 更旧，接口要 startDate <= endDate
   galFetchRange(D[gapEnd].ymd, D[gapStart].ymd);
@@ -3085,24 +4126,31 @@ function galTakeItems(items){
     gal.items.set(it.id, it);
     let all = gal.dayItems.get(ek);
     if(!all){ all = []; gal.dayItems.set(ek, all); }
-    all.push(it);
+    /* 缓冲命中后同一批可能再拉一次，按 id 去重，别把同一天的照片贴两遍 */
+    if(!all.some(x => String(x.id) === String(it.id))) all.push(it);
   }
   byDay.forEach((arr, ek) => {
     const el = pool.querySelector(`.day[data-ymd="${ek}"]`);
     if(!el) return;
     const grid = el.querySelector('.grid');
     if(grid){
-      grid.innerHTML = arr.map(it => cardHTML(it)).join('');
+      const all = gal.dayItems.get(ek) || arr;
+      grid.innerHTML = all.map(it => cardHTML(it)).join('');
       const cnt = el.querySelector('.dayh .n');
-      if(cnt) cnt.textContent = arr.length + ' 项';
+      if(cnt) cnt.textContent = all.length + ' 项';
     }
     gal.filled.add(ek);
   });
   if(items.length){
-    gal.order = gal.order.concat(items).sort((x, y) => (y.date || 0) - (x.date || 0));
+    const have = new Set(gal.order.map(x => String(x.id)));
+    items.forEach(it => {
+      if(!have.has(String(it.id))){ gal.order.push(it); have.add(String(it.id)); }
+    });
+    gal.order.sort((x, y) => (y.date || 0) - (x.date || 0));
     state.items = gal.order;
     bindCards();
   }
+  galMemoTouch();
 }
 
 /* 占位块重画之后（换缩略图档位 / 改窗口大小）：把已经拿到的照片贴回去，不重新请求 */
@@ -3127,11 +4175,15 @@ function galRefill(){
   if(need.length) bindCards();
 }
 
-/* ---- 缩略图档位 / 窗口尺寸变了：重排几何，滚回原来的那一天 ---- */
+/* ---- 缩略图档位 / 窗口尺寸 / 列表宽度变了：原地改日期块位置，不重画卡片 ----
+   旧实现是 galPaint() 整块 innerHTML 重建，卡片的 blur-up 会重新触发，
+   所以每次拖窗口都能看到缩略图闪一下。这里只改 .day 的 top/height 和
+   pool 高度，已贴上的缩略图 DOM 原样保留，CSS 网格自己回流。 */
 function galRelayout(){
   if(!gal.idx || !gal.idx.days || !gal.dayOff.length) return;
   const box = $('#content');
-  if(!box || !$('#vpool')) return;
+  const pool = $('#vpool');
+  if(!box || !pool) return;
   const top0 = box.scrollTop;
   let a = 0, b = gal.dayOff.length - 1, cur = 0;
   while(a <= b){
@@ -3139,12 +4191,31 @@ function galRelayout(){
     if(gal.dayOff[mid] <= top0 + 4){ cur = mid; a = mid + 1; } else { b = mid - 1; }
   }
   const ymd = gal.idx.days[cur].ymd;
+  const within = Math.max(0, top0 - gal.dayOff[cur]);
+  const oldH = gal.dayH[cur] || 1;
   galLayout();
-  gal.filled = new Set();       // 占位块重画了，之前的标记作废，已取到的照片由 galRefill 贴回
-  galPaint();
-  galRefill();
+  const D = gal.idx.days;
+  for(let i = 0; i < D.length; i++){
+    const el = pool.querySelector(`.day[data-ymd="${D[i].ymd}"]`);
+    if(!el) continue;
+    el.style.top = gal.dayOff[i] + 'px';
+    el.style.height = gal.dayH[i] + 'px';
+    /* 已有真卡片的日期不动；已经铺过骨架的日期才按新的每行数量补齐。
+       空白的日期不要在这里铺，交给 galWindow 只补视口内的几块。 */
+    const grid = el.querySelector('.grid');
+    if(grid && !gal.filled.has(D[i].ymd) && !gal.dayItems.has(D[i].ymd) && grid.children.length){
+      const need = Math.max(1, Math.min(D[i].n || 1, 80));
+      if(grid.children.length !== need){
+        let h = '';
+        for(let k = 0; k < need; k++) h += '<div class="card skc"></div>';
+        grid.innerHTML = h;
+      }
+    }
+  }
+  pool.style.height = gal.total + 'px';
   const d = gal.byYmd.get(ymd);
-  box.scrollTop = d ? d.off : 0;
+  const keep = d ? Math.min(within, Math.max(0, d.h - 8)) : 0;
+  box.scrollTop = d ? d.off + keep : 0;
   galWindow();
   renderTimeline();
   updateTimelineActive();
@@ -3172,6 +4243,7 @@ async function loadAlbum(id, opts){
   /* 同一本：刷新/删除后用当前高度；从页签切回来时 renderTab 已把高度清零，
      这时改用记住的位置。 */
   const savedTop = sameAlbum ? (top0 > 0 ? top0 : savedMap) : savedMap;
+  if(gal.album != null && gal.idx) galMemoTouch();     // 离开前把这一本的照片条目留在内存里
   const mySeq = ++gal.seq;
   state.album = id;
   state.videoOnly = !!o.video;
@@ -3184,6 +4256,17 @@ async function loadAlbum(id, opts){
   gal.filled = new Set(); gal.ranges = []; gal.fetching = false;
   gal.dayItems = new Map(); gal.items = new Map(); gal.order = [];
   gal.flowDay = null; gal.flowEl = null;
+  /* 同一本相簿这次已经加载过：把索引 + 已取到的照片条目恢复回来，
+     切回页签/换回相簿时直接贴真卡片，不再先铺 .card.skc 骨架。 */
+  const memo = o.fresh ? null : galMemoPeek(id, !!o.video);
+  if(memo && memo.idx && memo.idx.days && memo.idx.days.length){
+    gal.idx = memo.idx;
+    gal.dayItems = memo.dayItems || new Map();
+    gal.items = memo.items || new Map();
+    gal.order = memo.order || [];
+    gal.ranges = memo.ranges || [];
+    state.items = gal.order;
+  }
   sel.clear(); updSel();
   c.style.overflow = 'auto';
   c.scrollTop = 0;
@@ -3198,8 +4281,8 @@ async function loadAlbum(id, opts){
   state.selHint = alb ? '· ' + alb.name : '';
   galleryChrome();
 
-  // 索引在本地缓存里就同步画出来（不闪骨架屏）；没有才等接口
-  const fastIdx = o.fresh ? null : galIndexFromCache(id);
+  // 索引优先用这次已加载过的；没有再读本地 6 小时缓存；都没有才等接口
+  const fastIdx = o.fresh ? null : (gal.idx || galIndexFromCache(id));
   if(fastIdx){
     gal.idx = fastIdx;
     galLayout();
@@ -3208,6 +4291,12 @@ async function loadAlbum(id, opts){
     galWindow();
     buildTimeline();
     c.onscroll = () => { galPump(); updateTimelineActive(); };
+    /* 缓存索引最多 6 小时：先用它把画面顶出来，过一会儿再悄悄和云端核一次。
+       手机上刚拍的照片就能补进当前相簿，不用等缓存过期或手动刷新。 */
+    if(!o.fresh){
+      clearTimeout(gal.revalT);
+      gal.revalT = setTimeout(() => revalidateGalIndex(id, mySeq), 900);
+    }
     return;
   }
   let idx;
@@ -3689,26 +4778,127 @@ function recordRangeSelect(id){
 }
 
 /* ============ 笔记 / 代办 ============ */
-async function renderNotes(){
-  setHead('笔记'); setDl(false);
-  showBtn('#btnNew', true, '新建笔记', 'i-plus');
-  let d;
-  try{ d = await api('/api/notes'); }
-  catch(e){ if(String(e.message)!=='auth') $('#content').innerHTML='<div class="empty">读取笔记失败</div>'; return; }
-  if(TAB !== 'note') return;         // 页签已经切走，迟到的结果不要再画
-  state.notes = d.notes || [];
-  state.folders = d.folders || [];
-  if(!state.noteView) state.noteView = {folder:'all', todo:false};
-  $('#left').style.display = 'none';        // 分类改用列表顶部的 chips
-  const c=$('#content');
-  c.style.overflow='hidden';
-  c.innerHTML = '';
-  showNotePane();                            // 统一由它创建「列表 + 底部多选条 + 阅读栏」
+/* 笔记正文内存缓存：读过的笔记再点开先给正文，不用每次都等接口。
+   只放最近 30 条，切页签或重启就没了——不在磁盘上留正文。 */
+const NOTE_BODY = new Map();
+const NOTE_BODY_MAX = 30;
+function noteBodyGet(id){ return NOTE_BODY.get(String(id)) || null; }
+function noteBodyPut(id, n){
+  id = String(id);
+  if(!n) return;
+  NOTE_BODY.delete(id);
+  NOTE_BODY.set(id, n);
+  while(NOTE_BODY.size > NOTE_BODY_MAX) NOTE_BODY.delete(NOTE_BODY.keys().next().value);
+}
+function noteBodyDrop(id){ NOTE_BODY.delete(String(id)); }
+
+/* 笔记列表底部：读取中的一行，形状跟真实的一条笔记一样，
+   不铺相册式的方块骨架，避免「骨架屏 → 笔记页」这种跳变。 */
+function noteListLoading(){
+  const box = $('#noteList');
+  if(!box) return;
+  box.innerHTML = `<div class="nhead"><div class="notefilter" id="noteFilter"></div></div>
+    <div class="note-load"><span class="spinner"></span>正在读取笔记 …</div>`;
+}
+function noteShellEmpty(){
   const rd = $('#noteReader');
   if(rd && !rd.innerHTML.trim()){
     rd.innerHTML = `<div class="empty"><div class="big2">${ICO('i-note','xl')}</div>左边点一条笔记就开始读</div>`;
   }
-  drawNoteList(true);
+}
+
+/* 本地新建/改名/删除后先把手上的列表对齐：不等整表刷新，界面立刻一致。
+   select=true 时顺手把这条标成当前选中。 */
+function upsertNoteLocal(n, select){
+  if(!n || n.id == null) return;
+  const id = String(n.id);
+  const list = state.notes = state.notes || [];
+  const item = {
+    id,
+    title: n.title || '（无标题）',
+    preview: n.preview != null ? n.preview : '（空）',
+    modified: n.modified || Date.now(),
+    created: n.created || n.modified || Date.now(),
+    folder: String(n.folder != null ? n.folder : '0'),
+    enc: !!n.enc
+  };
+  const i = list.findIndex(x => String(x.id) === id);
+  if(i >= 0) list[i] = Object.assign({}, list[i], item);
+  else list.unshift(item);
+  list.sort((a, b) => (b.modified || 0) - (a.modified || 0));
+  if(select) state.noteId = id;
+  drawNoteList(false);        // 保留正在读的那条，不跳回第一条
+}
+
+function removeNotesLocal(ids){
+  const dead = new Set((ids || []).map(String));
+  state.notes = (state.notes || []).filter(n => !dead.has(String(n.id)));
+  dead.forEach(noteBodyDrop);
+  if(dead.has(String(state.noteId))) state.noteId = null;
+}
+
+/* 先把数据写进 state 再重画列表；silent=true 表示后台补数据，别动正在读的正文。 */
+function applyNotesData(d, silent){
+  if(TAB !== 'note') return;
+  state.notes = d.notes || [];
+  state.folders = d.folders || [];
+  state.notesAt = d.at || state.notesAt || 0;
+  const box = $('#noteList');
+  const sc = box ? box.scrollTop : 0;
+  drawNoteList(false);
+  if(box) box.scrollTop = sc;
+  if(silent){
+    const cur = state.noteId;
+    const hit = cur && state.notes.find(n => String(n.id) === String(cur));
+    // 后台刷新发现当前这条改过，正文悄悄更新一次，不闪整页
+    const readAt = (state.noteReadAt || {})[String(cur)];
+    if(hit && readAt && hit.modified && hit.modified !== readAt) showNote(cur, {quiet:true});
+  }
+}
+
+/* 打开笔记页签：
+   1) 同步画出真实的双栏布局（不等接口）；
+   2) 有上次的列表就先画出来（秒开），再让接口在后台补数据；
+   3) 完全没有缓存时才显示「正在读取笔记」那一行。
+   以前是：整块骨架屏 → 等 /api/notes 把所有页翻完 → 整页重画。 */
+async function renderNotes(opt){
+  const o = opt || {};
+  setHead('笔记'); setDl(false);
+  showBtn('#btnNew', true, '新建笔记', 'i-plus');
+  if(!state.noteView) state.noteView = {folder:'all', todo:false};
+  $('#left').style.display = 'none';        // 分类改用列表顶部的 chips
+  const c = $('#content');
+  c.style.overflow = 'hidden';
+  if(!$('#noteShell') || !$('#noteLeft')) c.innerHTML = '';
+  showNotePane();                           // 真实布局：列表 + 多选条 + 阅读栏
+  noteShellEmpty();
+  const warm = !!(state.notes && state.notes.length);
+  if(warm){
+    drawNoteList(false);                      // 用上次的列表直接画，保留当前选中
+    // 上次读到一半的那篇也直接放回来（有正文缓存就同步画，没有才走一次接口）
+    const cur = state.noteId;
+    if(cur && !$('#noteEdit') && state.notes.some(n => String(n.id) === String(cur))){
+      const openHit = noteBodyGet(cur);
+      if(openHit) paintNote(openHit); else showNote(cur);
+    }
+  }else noteListLoading();
+  /* 每次进页签都去云端核一遍：后端那个 5 分钟缓存只用来「先画出来」，
+     不能拿它当最终结果，否则在手机上新建的笔记切回来根本看不到。整表只有
+     几十条，强制刷新也就两三百毫秒。 */
+  const req = api('/api/notes?refresh=1');
+  if(o.fresh || !warm){
+    try{ applyNotesData(await req); }
+    catch(e){
+      if(String(e.message) === 'auth') return;
+      const box = $('#noteList');
+      if(box && !(state.notes && state.notes.length)) box.innerHTML = `<div class="empty">读取笔记失败</div>`;
+    }
+    return;
+  }
+  // 有缓存就不挡着：接口回来静默补上（这次带 refresh=1，拿到的就是云端最新）
+  req.then(d => applyNotesData(d, true)).catch(e => {
+    if(String(e.message) !== 'auth') console.log('笔记后台刷新失败', e);
+  });
 }
 
 function filteredNotes(){
@@ -3726,10 +4916,14 @@ function drawNoteChips(){
   const box = $('#noteFilter');
   if(!box) return;
   const v = state.noteView || {folder:'all'};
+  /* 逻辑：全部固定第一，其余分类按条数从多到少；同数量按名称，刷新后顺序稳定 */
+  const cats = (state.folders || []).slice().sort((a, b) =>
+    (Number(b.count) || 0) - (Number(a.count) || 0) ||
+    String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hans-CN'));
   const chips = [{id:'all', name:'全部', count:state.notes.length}]
-    .concat(state.folders.map(f => ({id:f.id, name:f.name, count:f.count})));
+    .concat(cats.map(f => ({id:f.id, name:f.name, count:f.count})));
   box.innerHTML = chips.map(c => `<button class="chip${v.folder===c.id?' on':''}" data-f="${c.id}">${
-      esc(c.name)}<em>${c.count}</em></button>`).join('');
+      `<span class="cn">${esc(c.name)}</span>`}<em>${c.count}</em></button>`).join('');
   $$('#noteFilter .chip').forEach(b => b.onclick = () => {
     state.noteView = {folder: b.dataset.f};
     drawNoteList(true);
@@ -3753,6 +4947,8 @@ function showNotePane(){
       <div id="noteReader"></div></div>`;
   }
   $('#noteList').style.display='';
+  syncPanelGrip();
+  setTimeout(syncPanelGrip, 0);
 }
 
 function drawNoteList(reselect){
@@ -3841,12 +5037,28 @@ function drawNoteList(reselect){
     $$('#noteList .note').forEach(x=>x.classList.toggle('on',x===el));
     showNote(el.dataset.id);
   });
-  const cur = box.querySelector('.note.on');
-  const target = (reselect || !cur) ? box.querySelector('.note') : cur;
+  /* 重画后原来的 .on 已经随 DOM 一起没了，这里按 id 把「正在读的那条」找回来：
+     后台补数据、改分类都只重画列表，不跳到第一条、也不重新请求正文。
+     reselect=true（换分类/强制刷新）才回到第一条。 */
+  let target = null;
+  if(reselect){
+    target = box.querySelector('.note');
+  }else if(state.noteId != null){
+    try{ target = box.querySelector(`.note[data-id="${CSS.escape(String(state.noteId))}"]`); }
+    catch(_){ target = null; }
+    if(!target){
+      $$('#noteList .note').forEach(x => {
+        if(x.dataset.id === String(state.noteId)) target = x;
+      });
+    }
+  }
+  if(!target && !reselect) target = box.querySelector('.note.on');
   // 正在编辑时不自动切到第一条，否则会把编辑器冲掉
   if(target && !$('#noteEdit')){
     $$('#noteList .note').forEach(x=>x.classList.toggle('on',x===target));
-    showNote(target.dataset.id);
+    if(String(target.dataset.id) !== String(state.noteId) || !$('#noteReader').innerHTML.trim()){
+      showNote(target.dataset.id);
+    }
   }
 }
 
@@ -3984,24 +5196,13 @@ function noteDisplayBody(n){
   return body;
 }
 
-async function showNote(id){
-  state.noteId = id;
+/* 把一条笔记画进右侧阅读栏。options.quiet=true 表示后台刷新补正文：
+   保留当前滚动位置，别把正在读的人甩回顶部。 */
+function paintNote(n, options){
+  const o = options || {};
   const r = $('#noteReader');
-  if(r){
-    /* 阅读页 = 上面可滚的正文 + 底下一根固定的信息栏 */
-    r.style.display = 'flex';
-    r.style.flexDirection = 'column';
-    r.style.overflow = 'hidden';
-  }
-  let n;
-  try{ n = await api('/api/note?id='+encodeURIComponent(id)); }
-  catch(e){
-    if(String(e.message)!=='auth') toast('这条笔记读不出来');
-    if(r && r.isConnected) r.innerHTML =
-      `<div class="empty"><div class="big2">${ICO('i-note','xl')}</div>这条笔记读不出来</div>`;
-    return;
-  }
-  if(!r || !r.isConnected) return;    // 页面已经切走（例如快速切页签）
+  if(!r || !r.isConnected) return;
+  const keepScroll = o.quiet ? (($('#noteScroll') && $('#noteScroll').scrollTop) || 0) : 0;
   const bodyMd = noteDisplayBody(n);
   r.innerHTML = `<div id="noteScroll"><div id="notePad">
     <div class="nrow">
@@ -4016,13 +5217,51 @@ async function showNote(id){
   <div id="noteMeta"><span>创建 ${fmtDate(n.created)}</span>
     <span>修改 ${fmtDate(n.modified)}</span>
     ${n.enc?'<span style="color:var(--accent)">· 已本地解密</span>':''}</div>`;
-  const sc = $('#noteScroll'); if(sc) sc.scrollTop = 0;
+  const sc = $('#noteScroll'); if(sc) sc.scrollTop = keepScroll;
+  state.noteReadAt = state.noteReadAt || {};
+  if(n && n.id != null) state.noteReadAt[String(n.id)] = n.modified || 0;
   $$('#noteBody img.mdimg').forEach(img => {
     img.onclick = () => openViewer({id: img.src, name: '笔记图片', type: 'image',
                                     date: 0, fullUrl: img.src, bigUrl: img.src, thumbUrl: img.src});
   });
   $('#btnDelNote').onclick = () => deleteNotes([n.id]);
   $('#btnEditNote').onclick = () => openNoteEditor(n);
+}
+
+async function showNote(id, options){
+  id = String(id);
+  state.noteId = id;
+  const r = $('#noteReader');
+  if(r){
+    /* 阅读页 = 上面可滚的正文 + 底下一根固定的信息栏 */
+    r.style.display = 'flex';
+    r.style.flexDirection = 'column';
+    r.style.overflow = 'hidden';
+  }
+  // 读过的先画出来，点了立刻有内容；接口回来再核对有没有更新
+  const hit = noteBodyGet(id);
+  if(hit) paintNote(hit, options);
+  if(state._notePending === id) return;   // 同一篇已在请求中，别重复发
+  state._notePending = id;
+  try{
+    let n;
+    try{ n = await api('/api/note?id='+encodeURIComponent(id)); }
+    catch(e){
+      if(String(e.message)!=='auth' && !hit) toast('这条笔记读不出来');
+      if(!hit && r && r.isConnected) r.innerHTML =
+        `<div class="empty"><div class="big2">${ICO('i-note','xl')}</div>这条笔记读不出来</div>`;
+      return;
+    }
+    if(!r || !r.isConnected) return;    // 页面已经切走（例如快速切页签）
+    if(state.noteId !== id) return;     // 连点两条：只画最后点的那条
+    noteBodyPut(id, n);
+    // 内容没变就不重绘，免得正文闪一下
+    const changed = !hit || hit.title !== n.title || hit.content !== n.content
+                    || (hit.modified|0) !== (n.modified|0);
+    if(changed) paintNote(n, options);
+  }finally{
+    if(state._notePending === id) state._notePending = null;
+  }
 }
 
 /* 同页编辑：左写右看，输入即渲染；新建也走这里，不再弹窗 */
@@ -4221,6 +5460,7 @@ function openNoteEditor(note){
   const ed = $('#neBody'), titleIn = $('#neTitle');
   // 载入：有本机暂存就先显示暂存，否则显示云端原文
   ed.innerHTML = renderMd(draft ? (draft.body || '') : (n.content || ''));
+  if(!ed.textContent.trim() && !ed.querySelector('img,video')) ed.innerHTML = '';
   const setDirtyTag = text => {
     const d = $('#neDirty');
     if(d){ d.textContent = text; d.style.display = ''; }
@@ -4303,16 +5543,28 @@ function openNoteEditor(note){
           body:JSON.stringify({title, content:body, folder})});
         editorDirty = false;
         dropNoteDraft(editingNoteId); editingNoteId = null;
-        await renderNotes();
-        if(res.id) showNote(res.id);
+        leaveNoteEditor();
+        if(res.id){
+          // 列表先本地插入，正文先用刚写完的，等接口在后台核对
+          upsertNoteLocal(Object.assign({id:res.id, title, preview:body.trim().slice(0,180),
+                                         content:body, folder}, res), true);
+          noteBodyPut(res.id, {id:String(res.id), title, content:body,
+            created:(res && res.created) || Date.now(), modified:(res && res.modified) || Date.now()});
+          showNote(res.id);
+        }
         toast('笔记已创建');
       }else{
-        await api('/api/note_save', {method:'POST',
+        const r2 = await api('/api/note_save', {method:'POST',
           headers:{'Content-Type':'application/json'},
           body:JSON.stringify({id:n.id, title, content:body})});
         editorDirty = false;
         dropNoteDraft(editingNoteId); editingNoteId = null;
-        await renderNotes();
+        leaveNoteEditor();
+        const prev = noteBodyGet(n.id) || {};
+        noteBodyPut(n.id, Object.assign({}, prev, {id:String(n.id), title, content:body,
+          created:(prev && prev.created) || n.created || 0,
+          modified:(r2 && r2.modified) || Date.now()}));
+        upsertNoteLocal(Object.assign({id:n.id, title, preview:body.trim().slice(0,180)}, r2 || {}), true);
         showNote(n.id);
         toast('已保存');
       }
@@ -4368,12 +5620,45 @@ function todoRow(t){
   </div>`;
 }
 
+/* 代办列表的占位行：借真实 .todo 的骨架（勾选框 + 标题行 + 子项行 + 日期），
+   不再是「一整屏转圈」，也不是相册方块。 */
+function todoSkeleton(n){
+  const row = `<div class="todo skrow">
+      <span class="bx"></span>
+      <div class="tx">
+        <span class="ttl"><i class="sk" style="display:block;width:54%;height:12px"></i></span>
+        <div class="sub"><div><span class="sdot"></span>
+          <i class="sk" style="display:block;width:34%;height:9px"></i></div></div>
+      </div>
+      <span class="dt"><i class="sk" style="display:block;width:30px;height:9px"></i></span>
+    </div>`;
+  return row.repeat(n || 7);
+}
+function drawTodoSkeleton(){
+  $('#content').innerHTML = `<div id="todoWrap">
+    <div id="todoBody">${todoSkeleton()}</div>
+    <div id="todoPager"><span class="pinfo"><span class="spinner"></span>正在读取代办 …</span></div>
+  </div>`;
+}
+
 async function renderTodos(force){
   setHead('代办'); setDl(false);
   showBtn('#btnNew', true, '新建代办', 'i-plus');
   const c=$('#content');
-  if(!state.todos || force){
-    c.innerHTML = `<div class="empty"><span class="spinner"></span>正在取代办 …</div>`;
+  if(!state.todoView) state.todoView='all';
+  if(!state.todoPage) state.todoPage=1;
+  c.style.overflow='auto';
+  const has = Array.isArray(state.todos);     // 有数据（哪怕是 0 条）就不再铺占位
+  if(has){
+    /* 有手上的列表就直接画：切回页签不闪，强制刷新也先保留旧内容 */
+    drawTodoFilters(); drawTodoList();
+  }else{
+    /* 第一次进来：先把左侧筛选和「代办形状」的占位行画出来，再等接口 */
+    state.todos = [];
+    drawTodoFilters();
+    drawTodoSkeleton();
+  }
+  if(!has || force){
     try{ const d = await api('/api/todos' + (force?'?refresh=1':'')); state.todos = d.todos || []; state.todosAt = d.at || 0; }
     catch(e){
       const m = String(e.message||'');
@@ -4408,16 +5693,11 @@ async function renderTodos(force){
   }
   /* 页签已经切走（比如点完待办马上点相册），别再用迟到的结果覆盖当前页面 */
   if(TAB !== 'todo') return;
-  /* 默认仍是「全部」，但列表改成每页 50 条分页，不会再把几千条一次性铺开 */
-  if(!state.todoView) state.todoView='all';
-  if(!state.todoPage) state.todoPage=1;
-  c.style.overflow='auto';
   drawTodoFilters();
   drawTodoList();
-  /* 刚显示的是本地缓存：超过 1 分钟（或 at=0 的旧缓存）就在后台悄悄刷一次，不挡操作 */
-  if(!force && (!state.todosAt || (Date.now()/1000 - state.todosAt > 60))){
-    setTimeout(refreshTodosQuiet, 600);
-  }
+  /* 有缓存就先画出来，然后立刻做一次增量同步（只拉 syncToken 之后的变化）。
+     在手机上新建/勾掉的代办，切回来一两百毫秒内就会补上，不用再点刷新。 */
+  if(has && !force) setTimeout(refreshTodosQuiet, 0);
 }
 
 /* 新建/编辑代办后只刷新数据、原地重画：不跳空白页、不重新走骨架屏 */
@@ -4433,18 +5713,41 @@ async function refreshTodoState(){
   }
 }
 
-/* 先显示缓存列表，后台再刷新；刷新完只在还停在代办页、且没开编辑弹窗时更新 */
+/* 拉一次代办最新数据：优先增量同步（syncToken），老缓存没有游标时才全量。
+   不负责重画，调用方自己决定怎么画。 */
+async function refreshTodoState(quiet){
+  try{
+    let d = await api('/api/todos?sync=1');
+    if(!Array.isArray(d.todos)){
+      // 老版本缓存没有 syncToken，退化成一次全量
+      d = await api('/api/todos?refresh=1&since=' + encodeURIComponent(state.todosAt || 0));
+    }
+    state.todos = d.todos || [];
+    state.todosAt = d.at || 0;
+    return d;
+  }catch(e){
+    if(!quiet) toast('刷新代办失败：' + errMsg(e));
+    return null;
+  }
+}
+
+/* 先显示缓存列表，后台增量同步；只在还停在代办页、且没开编辑弹窗时更新 */
 async function refreshTodosQuiet(){
   if(TAB !== 'todo') return;
   if($('#modal') && $('#modal').classList.contains('on')) return;
+  const btn = $('#btnRefresh');
+  if(btn) btn.classList.add('spin');
   try{
-    const d = await api('/api/todos?refresh=1&since=' + encodeURIComponent(state.todosAt || 0));
+    const d = await refreshTodoState(true);
+    if(!d) return;
     if(TAB !== 'todo' || ($('#modal') && $('#modal').classList.contains('on'))) return;
-    state.todos = d.todos || [];
-    state.todosAt = d.at || 0;
     drawTodoFilters();
     drawTodoList(true);
-  }catch(e){ /* 静默失败：下次打开/刷新还会再试 */ }
+  }catch(e){
+    /* 静默失败：下次切页签还会再同步 */
+  }finally{
+    if(btn) btn.classList.remove('spin');
+  }
 }
 
 function drawTodoFilters(){
@@ -4643,16 +5946,99 @@ async function submitTodoEdit(){
 }
 
 /* ============ 录音 ============ */
+/* 录音/云盘列表的占位行：用真实 .item 的骨架（图标位 + 标题行 + 副标题行），
+   跟加载出来的行同一套尺寸，数据到了不会整行跳高跳矮。 */
+function listSkeletonRows(n, iconClass){
+  const row = `<div class="item skrow">
+      <span class="ic ${iconClass || 'audio'}"></span>
+      <div class="main">
+        <div class="t1"><i class="sk" style="display:block;width:38%;height:11px"></i></div>
+        <div class="t2"><i class="sk" style="display:block;width:24%;height:9px"></i></div>
+      </div>
+      <i class="sk" style="display:block;width:${iconClass === 'folder' ? 46 : 110}px;height:10px"></i>
+    </div>`;
+  return row.repeat(n || 7);
+}
+function recordSkeleton(n){ return listSkeletonRows(n || 7, 'audio'); }
+function driveSkeleton(n){
+  if(state.driveView === 'grid'){
+    return `<div class="dcard skrow">
+      <div class="dtop"><span class="dic folder"></span></div>
+      <i class="sk" style="display:block;width:72%;height:10px"></i>
+      <i class="sk" style="display:block;width:48%;height:9px"></i></div>`.repeat(n || 10);
+  }
+  return listSkeletonRows(n || 8, 'folder');
+}
+
+function recordRowHTML(r){
+  return `<div class="item" data-id="${esc(r.id)}">
+    <span class="tick2" data-id="${esc(r.id)}">${ICO('i-check')}</span>
+    <span class="ic audio">${ICO('i-wave')}</span>
+    <div class="main">
+      <div class="t1" title="${esc(r.name)}">${esc(r.label || r.name)}</div>
+      <div class="t2">${fmtDate(r.date)}${r.dur!=null?' · '+fmtDur(r.dur):''}${r.size?' · '+fmtSize(r.size):''}</div>
+    </div>
+    <div class="player" data-id="${esc(r.id)}">
+      <button class="pp" title="播放">${ICO('i-play','fill')}</button>
+      <span class="bar"><i></i></span>
+      <span class="tm">${fmtClock(r.dur)}</span>
+    </div>
+    <button class="rec-del" data-id="${esc(r.id)}" title="删除这条录音">${ICO('i-close')}</button>
+  </div>`;
+}
+
 async function renderRecords(force){
   setHead('录音'); setDl(true); state.selHint='';
   showBtn('#btnTrash', true, '录音回收站', 'i-trash');
-  state.records=[]; state.off=0; state.ended=false; state.loading=false;
-  state.recForce = !!force;
   $('#left').style.display='none';
+  const cached = !force && Array.isArray(state.records) && state.records.length;
+  if(cached){
+    /* 上次已经加载过的列表先画出来：切回录音页签不再走一遍骨架 → 数据 */
+    $('#content').innerHTML = `<div class="subhead"><span id="recCount"></span></div>
+      <div class="lists" id="recList"></div>`;
+    $('#recList').innerHTML = state.records.map(recordRowHTML).join('');
+    $('#recCount').textContent = `全部录音 · ${state.records.length} 条`;
+    bindRecords();
+    setSentinel(state.ended ? '已经到底了' : '', false);
+    attachInfinite(recordsMore);
+    state.loading = false; state.recForce = false;
+    /* 上次的列表先顶上，后台再拉一次第一页：新录音（比如刚在手机上录的）
+       切回来就能补出来，不用点刷新。 */
+    setTimeout(refreshRecordsQuiet, 0);
+    return;
+  }
+  state.records=[]; state.off=0; state.ended=false; state.loading=false;
+  state.recForce = true;          // 首次加载也强制要云端最新的第一页
   $('#content').innerHTML = `<div class="subhead"><span id="recCount">全部录音</span></div>
-    <div class="lists" id="recList">${skeleton('list')}</div>`;
+    <div class="lists" id="recList">${recordSkeleton()}</div>`;
   attachInfinite(recordsMore);
   await recordsMore();
+}
+
+/* 录音页的后台补刷：只拉最新第一页，原地替换，不闪骨架；正在多选就不动列表 */
+async function refreshRecordsQuiet(){
+  if(TAB !== 'record' || sel.size) return;
+  const btn = $('#btnRefresh');
+  if(btn) btn.classList.add('spin');
+  try{
+    const d = await api('/api/records?offset=0&limit=100&refresh=1');
+    if(TAB !== 'record' || sel.size) return;
+    const fresh = d.records || [];
+    state.records = fresh.slice();
+    state.off = fresh.length;
+    state.ended = fresh.length < 100;
+    const box = $('#recList');
+    if(!box) return;
+    box.innerHTML = fresh.map(recordRowHTML).join('');
+    bindRecords();
+    const rc = $('#recCount');
+    if(rc) rc.textContent = `全部录音 · ${state.records.length} 条`;
+    setSentinel(state.ended ? (fresh.length ? '已经到底了' : '没有录音') : '', false);
+  }catch(e){
+    /* 静默失败：下次切回来还会补 */
+  }finally{
+    if(btn) btn.classList.remove('spin');
+  }
 }
 
 async function recordsMore(){
@@ -4667,22 +6053,8 @@ async function recordsMore(){
     state.off += records.length;
     state.ended = records.length < 100;
     state.records.push(...records);
-    if(records.length) $('#recList').querySelectorAll('.sk-lines').forEach(n=>n.remove());
-    $('#recList').insertAdjacentHTML('beforeend', records.map(r=>`
-      <div class="item" data-id="${esc(r.id)}">
-        <span class="tick2" data-id="${esc(r.id)}">${ICO('i-check')}</span>
-        <span class="ic audio">${ICO('i-wave')}</span>
-        <div class="main">
-          <div class="t1" title="${esc(r.name)}">${esc(r.label || r.name)}</div>
-          <div class="t2">${fmtDate(r.date)}${r.dur!=null?' · '+fmtDur(r.dur):''}${r.size?' · '+fmtSize(r.size):''}</div>
-        </div>
-        <div class="player" data-id="${esc(r.id)}">
-          <button class="pp" title="播放">${ICO('i-play','fill')}</button>
-          <span class="bar"><i></i></span>
-          <span class="tm">${fmtClock(r.dur)}</span>
-        </div>
-        <button class="rec-del" data-id="${esc(r.id)}" title="删除这条录音">${ICO('i-close')}</button>
-      </div>`).join(''));
+    $('#recList').querySelectorAll('.skrow').forEach(n=>n.remove());
+    $('#recList').insertAdjacentHTML('beforeend', records.map(recordRowHTML).join(''));
     bindRecords();
     const rc = $('#recCount');
     if(rc) rc.textContent = `全部录音 · ${state.records.length} 条`;
@@ -5022,7 +6394,7 @@ async function driveOpen(parent, trail){
   const c=$('#content');
   c.innerHTML = `<div class="lists">
       <div id="crumb"></div>
-      <div id="driveList" class="${state.driveView==='grid'?'grid':''}">${skeleton('list')}</div></div>`;
+      <div id="driveList" class="${state.driveView==='grid'?'grid':''}">${driveSkeleton()}</div></div>`;
   c.scrollTop=0;
   drawCrumb();
   attachInfinite(driveMore);
@@ -5247,7 +6619,8 @@ async function driveMore(){
     state.drivePage++;
     state.driveEnded = !r.hasMore;
     state.driveItems.push(...items);
-    if(items.length) $('#driveList').querySelectorAll('.sk-lines').forEach(n=>n.remove());
+    /* 不管这一页有没有内容，占位行都要撤掉：空文件夹也得显示「这个文件夹是空的」 */
+    $('#driveList').querySelectorAll('.skrow').forEach(n=>n.remove());
     $('#driveList').insertAdjacentHTML('beforeend', items.map(driveEntryHTML).join(''));
     bindDrive();
     setSentinel(state.driveEnded ? (state.driveItems.length?'已经到底了':'这个文件夹是空的') : '', false);
@@ -5540,7 +6913,6 @@ const MIN_SCALE = 1, MAX_SCALE = 20;      // 都是相对「适应窗口」的�
 let vCurrent=null, vLoadedFull=false, vIsVideo=false, vPoll=null, vDragged=false;
 let vLoadSeq = 0;   // 每次打开/关闭 +1：上一张还在下载的回调不许再动这一张
 let vRotAbs = 0;      // 累计旋转角度（不做取模，CSS 才会一直往一个方向转）
-let vSavedView = null; // 「默认」按钮按住之前的状态，用来切回来
 function vRotMod(){ return ((vRotAbs % 360) + 360) % 360; }
 // 哪一层在显示：压缩图用 A，换原图后直接切到 B 层显示，A 保持旧图不再重绘 → 天然不闪
 let vImgEl=null;
@@ -5563,7 +6935,12 @@ function fittedSize(){
   return [img.naturalWidth*b*VP.scale, img.naturalHeight*b*VP.scale];
 }
 function clampPan(){
-  const st=$('#vStage'), [w,h]=fittedSize();
+  const st=$('#vStage');
+  /* 缩到「适应窗口」时没有可拖动的余量，必须回正中心。
+     之前这里还留了 ±30px 的平移余量，放大后从鼠标位置缩回 1x，
+     y 会停在某个偏移量；再点「默认/还原」把 y 归零，画面就上下跳。 */
+  if(VP.scale <= 1.001){ VP.x=0; VP.y=0; return; }
+  const [w,h]=fittedSize();
   const mx=Math.max(0,(w-st.clientWidth)/2 + 30);
   const my=Math.max(0,(h-st.clientHeight)/2 + 30);
   VP.x=Math.min(mx, Math.max(-mx, VP.x));
@@ -5807,7 +7184,7 @@ function openViewer(it, opts){
   if(vi) vi.onclick = () => showInfoPanel(vCurrent);
   const first = !vCurrent;
   vCurrent=it;
-  vRotAbs = 0; vSavedView = null;
+  vRotAbs = 0;
   const rBtn = document.getElementById('vReset'); if(rBtn) rBtn.textContent = '默认';
   // 原图已经在本地缓存里的话，打开就直接出原图（不然同一张图每次都要再点一次「查看原图」）
   vLoadedFull = !!(it.fullUrl && it.fullCached);
@@ -6084,21 +7461,14 @@ $('#vNext').onclick = e => { e.stopPropagation(); stepViewer(1); };
 $('#vIn').onclick  = () => zoomBy(1.25);
 $('#vOut').onclick = () => zoomBy(1/1.25);
 $('#vRot').onclick = () => { vRotAbs += 90; applyVP(); };
-// 「默认 / 还原」是一组开关：按一下回默认（适配、居中、不旋转），再按一下切回原来的缩放与角度
+// 「默认」就是归零：适应窗口、居中、角度回 0。
+// 不再做「再按一次回到刚才的缩放/偏移」的开关——那会在缩到最小后按按钮时
+// 把旧的 y 偏移还原回来，看起来像图片自己上下跳。
 $('#vReset').onclick = () => {
+  vRotAbs = 0;
+  resetVP();
   const btn = $('#vReset');
-  if(vSavedView){
-    VP.scale = vSavedView.scale; VP.x = vSavedView.x; VP.y = vSavedView.y;
-    vRotAbs = vSavedView.rot;
-    vSavedView = null;
-    btn.textContent = '默认';
-    applyVP();
-  }else{
-    vSavedView = { scale: VP.scale, x: VP.x, y: VP.y, rot: vRotAbs };
-    vRotAbs = 0;
-    resetVP();
-    btn.textContent = '还原';
-  }
+  if(btn) btn.textContent = '默认';
 };
 $('#vDl').onclick = () => {
   if(!vCurrent) return;
@@ -6268,7 +7638,6 @@ function toggleSelectAll(){
   $$('#content .tick2').forEach(t=>t.classList.toggle('on', sel.has(t.dataset.id)));
   $$('#content .item').forEach(it=>it.classList.toggle('sel', sel.has(it.dataset.id)));
   updSel();
-  toast(allSel ? '已取消全选' : `已选 ${sel.size} 项`);
 }
 /* 顶栏的「全选」和底部选择条的「全选」是同一个动作。以前两个按钮共用一个 id，
    querySelector 只绑到顶栏那个，选择条里那个点了没反应 —— 分开 id，绑同一个函数。 */

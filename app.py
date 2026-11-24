@@ -1349,7 +1349,13 @@ def note_create(title, content, folder_id="0"):
                       {"entry": json.dumps(entry, ensure_ascii=False)})
     if j.get("result") != "ok":
         raise RuntimeError(j.get("description") or j.get("reason") or "创建笔记失败")
-    return {"id": str(((j.get("data") or {}).get("entry") or {}).get("id") or "")}
+    nid = str(((j.get("data") or {}).get("entry") or {}).get("id") or "")
+    # 列表缓存里先补上这条，前端不用再整表拉一次才看得见
+    _notes_touch(item={"id": nid, "title": head, "preview": snippet or "（空）",
+                       "modified": now, "created": now,
+                       "folder": str(folder_id or "0")})
+    return {"id": nid, "title": head, "preview": snippet or "（空）",
+            "modified": now, "created": now, "folder": str(folder_id or "0")}
 
 
 def note_save(nid, title, content):
@@ -1384,7 +1390,13 @@ def note_save(nid, title, content):
                        {"entry": json.dumps(entry, ensure_ascii=False)})
     if j2.get("result") != "ok":
         raise RuntimeError(j2.get("description") or j2.get("reason") or "保存失败")
-    return {"id": nid}
+    _notes_touch(item={"id": nid, "title": head, "preview": snippet or "（空）",
+                       "modified": entry["modifyDate"],
+                       "created": int(entry.get("createDate") or 0),
+                       "folder": str(entry.get("folderId") or "0"),
+                       "enc": bool(entry.get("encryptInfo")),})
+    return {"id": nid, "title": head, "preview": snippet or "（空）",
+            "modified": entry["modifyDate"]}
 
 
 def _todo_max_ids():
@@ -2405,65 +2417,210 @@ def _dec_field(e, field):
     return raw
 
 
-def notes_v2():
-    """全部笔记 + 分类。按 syncTag 游标翻页，直到 lastPage。"""
-    entries, folders, tag, guard = [], None, None, 0
-    while True:
-        params = {"limit": 200}
-        if tag:
-            params["syncTag"] = tag
-        d = api_get("/note/v2/full/page", **params).get("data") or {}
-        batch = d.get("entries") or []
-        entries.extend(batch)
-        if folders is None:
-            folders = d.get("folders") or []
-        nxt = d.get("syncTag")
-        guard += 1
-        if d.get("lastPage") or not batch or guard > 40 or nxt == tag:
-            break
-        tag = nxt
+# ---------------------------------------------------------------- 笔记列表缓存
+# 以前每进一次「笔记」页签都要从云端整表翻页（每页 200 条，几百上千条要好几秒），
+# 界面只能先铺骨架屏干等，数据回来再整页重画 —— 就是「先骨架、再刷新」的来源。
+# 现在跟代办一样：内存 + DPAPI 磁盘缓存，打开先给上一次的结果，超过 5 分钟后台刷。
+NOTES_CACHE = {"at": 0.0, "notes": [], "folders": []}
+NOTES_FETCH_LOCK = threading.Lock()     # 同时只允许一个完整拉取
+NOTES_REFRESH_AFTER = 300               # 缓存超过 5 分钟就在后台刷一次
 
-    fmap = {}
-    for f in folders:
-        if f.get("deleteTime"):
-            continue
-        fmap[str(f.get("id"))] = f.get("subject") or "未命名分类"
 
-    notes, seen = [], set()
-    for e in entries:
-        if e.get("deleteTime"):
-            continue
-        nid = str(e.get("id"))
-        if nid in seen:
-            continue
-        seen.add(nid)
-        try:
-            extra = json.loads(e.get("extraInfo") or "{}")
-        except Exception:
-            extra = {}
-        text = _plain(_dec_field(e, "snippet"))
-        flat = re.sub(r"\s+", " ", text).strip()
-        title = (extra.get("title") or "").strip() or e.get("subject") or ""
-        notes.append({
-            "id": nid,
-            "title": title or flat[:18] or "（无标题）",
-            "preview": flat[:180] or ("加密笔记，点开读取" if e.get("encryptInfo") else "（空）"),
-            "modified": int(e.get("modifyDate") or 0),
-            "created": int(e.get("createDate") or 0),
-            "folder": str(e.get("folderId") or "0"),
-            "enc": bool(e.get("encryptInfo")),
-        })
-    notes.sort(key=lambda x: -x["modified"])
+def _notes_cache_path():
+    return os.path.join(CACHE_DIR, "notes.dat")
 
+
+def _notes_cache_load():
+    """读磁盘上的笔记缓存（DPAPI 加密，和登录票同一套保护）。只读。"""
+    try:
+        with open(_notes_cache_path(), "rb") as f:
+            o = json.loads(dpapi_unprotect(f.read()).decode("utf-8"))
+        if isinstance(o, dict) and isinstance(o.get("notes"), list):
+            return o
+    except Exception:
+        pass
+    return None
+
+
+def _notes_cache_save():
+    try:
+        blob = json.dumps({"at": NOTES_CACHE.get("at") or 0,
+                           "notes": NOTES_CACHE.get("notes") or [],
+                           "folders": NOTES_CACHE.get("folders") or []},
+                          ensure_ascii=False).encode("utf-8")
+        data = dpapi_protect(blob)
+        p = _notes_cache_path()
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        tmp = p + ".tmp"
+        with open(tmp, "wb") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, p)
+    except Exception as e:
+        print("[笔记] 缓存写盘失败：%s" % e)
+
+
+def _notes_recount():
+    """按缓存里的笔记重算每个分类的条数（改/删笔记后不用再整表拉一遍）。"""
     counts = {}
-    for n in notes:
-        counts[n["folder"]] = counts.get(n["folder"], 0) + 1
-    flist = [{"id": k, "name": v, "count": counts.get(k, 0)}
-             for k, v in fmap.items()]
-    flist.sort(key=lambda f: -f["count"])
+    for n in NOTES_CACHE.get("notes") or []:
+        f = str(n.get("folder") or "0")
+        counts[f] = counts.get(f, 0) + 1
+    keep = []
+    for f in NOTES_CACHE.get("folders") or []:
+        fid = str(f.get("id"))
+        if fid == "0":                 # 「未分类」原来固定放最后
+            continue
+        f["count"] = counts.get(fid, 0)
+        keep.append(f)
+    keep.sort(key=lambda f: -int(f.get("count") or 0))
     if counts.get("0"):
-        flist.append({"id": "0", "name": "未分类", "count": counts["0"]})
-    return {"folders": flist, "notes": notes}
+        keep.append({"id": "0", "name": "未分类", "count": counts["0"]})
+    NOTES_CACHE["folders"] = keep
+
+
+def _notes_touch(item=None, drop_ids=None):
+    """本地新建/保存/删除后，先把缓存里这一条改掉，不必等下次整表刷新。
+
+    缓存还没加载过就只标记过期，别拿「一条笔记」覆盖掉盘上的整份缓存。
+    """
+    if not NOTES_CACHE.get("notes"):
+        NOTES_CACHE["at"] = 0.0
+        return
+    items = NOTES_CACHE["notes"]
+    if drop_ids:
+        dead = {str(x) for x in drop_ids}
+        items = [n for n in items if str(n.get("id")) not in dead]
+    if item and item.get("id") is not None:
+        nid = str(item["id"])
+        row = {
+            "id": nid,
+            "title": item.get("title") or "（无标题）",
+            "preview": item.get("preview") or "（空）",
+            "modified": int(item.get("modified") or 0),
+            "created": int(item.get("created") or 0),
+            "folder": str(item.get("folder") or "0"),
+            "enc": bool(item.get("enc")),
+        }
+        for i, n in enumerate(items):
+            if str(n.get("id")) == nid:
+                row["created"] = int(item.get("created") or n.get("created") or 0)
+                items[i] = row
+                break
+        else:
+            items.append(row)
+        items.sort(key=lambda x: -(x.get("modified") or 0))
+    NOTES_CACHE["notes"] = items
+    NOTES_CACHE["at"] = time.time()    # 本地已经是最新的，不算过期
+    _notes_recount()
+    _notes_cache_save()
+
+
+def _notes_fetch_all(min_at=None):
+    """完整拉一遍笔记 + 分类（按 syncTag 游标翻页，直到 lastPage）。
+
+    min_at：调用方手上那份缓存的时间。等锁期间别的线程已经刷到更新的版本时，
+    直接用现成的，不重复拉一遍。
+    """
+    with NOTES_FETCH_LOCK:
+        if (min_at is not None and NOTES_CACHE.get("notes")
+                and (NOTES_CACHE.get("at") or 0) > min_at):
+            return {"notes": NOTES_CACHE["notes"], "folders": NOTES_CACHE["folders"],
+                    "at": NOTES_CACHE["at"]}
+        entries, folders, tag, guard = [], None, None, 0
+        while True:
+            params = {"limit": 200}
+            if tag:
+                params["syncTag"] = tag
+            d = api_get("/note/v2/full/page", **params).get("data") or {}
+            batch = d.get("entries") or []
+            entries.extend(batch)
+            if folders is None:
+                folders = d.get("folders") or []
+            nxt = d.get("syncTag")
+            guard += 1
+            if d.get("lastPage") or not batch or guard > 40 or nxt == tag:
+                break
+            tag = nxt
+
+        fmap = {}
+        for f in folders:
+            if f.get("deleteTime"):
+                continue
+            fmap[str(f.get("id"))] = f.get("subject") or "未命名分类"
+
+        notes, seen = [], set()
+        for e in entries:
+            if e.get("deleteTime"):
+                continue
+            nid = str(e.get("id"))
+            if nid in seen:
+                continue
+            seen.add(nid)
+            try:
+                extra = json.loads(e.get("extraInfo") or "{}")
+            except Exception:
+                extra = {}
+            text = _plain(_dec_field(e, "snippet"))
+            flat = re.sub(r"\s+", " ", text).strip()
+            title = (extra.get("title") or "").strip() or e.get("subject") or ""
+            notes.append({
+                "id": nid,
+                "title": title or flat[:18] or "（无标题）",
+                "preview": flat[:180] or ("加密笔记，点开读取" if e.get("encryptInfo") else "（空）"),
+                "modified": int(e.get("modifyDate") or 0),
+                "created": int(e.get("createDate") or 0),
+                "folder": str(e.get("folderId") or "0"),
+                "enc": bool(e.get("encryptInfo")),
+            })
+        notes.sort(key=lambda x: -x["modified"])
+
+        counts = {}
+        for n in notes:
+            counts[n["folder"]] = counts.get(n["folder"], 0) + 1
+        flist = [{"id": k, "name": v, "count": counts.get(k, 0)}
+                 for k, v in fmap.items()]
+        flist.sort(key=lambda f: -f["count"])
+        if counts.get("0"):
+            flist.append({"id": "0", "name": "未分类", "count": counts["0"]})
+        NOTES_CACHE.update({"at": time.time(), "notes": notes, "folders": flist})
+        _notes_cache_save()
+        print("[笔记] 共 %d 条 / %d 个分类" % (len(notes), len(flist)))
+        return {"notes": notes, "folders": flist, "at": NOTES_CACHE["at"]}
+
+
+def _notes_refresh_bg():
+    """后台刷一遍笔记缓存，不挡用户这次打开页签。"""
+    at0 = NOTES_CACHE.get("at") or 0
+
+    def work():
+        try:
+            _notes_fetch_all(min_at=at0)
+        except Exception as e:
+            print("[笔记] 后台刷新失败：%s %s" % (type(e).__name__, e))
+
+    threading.Thread(target=work, daemon=True).start()
+
+
+def notes_v2(force=False):
+    """全部笔记 + 分类。
+
+    有本地缓存就立刻返回（进页签秒出）；超过 5 分钟就在后台刷新。
+    没缓存 / 手动刷新（refresh=1）才同步拉云端（几百条要翻好几页，就是以前那几秒）。
+    """
+    if not NOTES_CACHE["notes"]:
+        o = _notes_cache_load()
+        if o and o.get("notes"):
+            NOTES_CACHE.update({"at": float(o.get("at") or 0),
+                                "notes": o["notes"],
+                                "folders": o.get("folders") or []})
+    if not force and NOTES_CACHE["notes"]:
+        if time.time() - (NOTES_CACHE.get("at") or 0) > NOTES_REFRESH_AFTER:
+            _notes_refresh_bg()
+        return {"notes": NOTES_CACHE["notes"], "folders": NOTES_CACHE["folders"],
+                "at": NOTES_CACHE["at"]}
+    return _notes_fetch_all(min_at=None if force else (NOTES_CACHE.get("at") or 0))
 
 
 def remember_note_files(entry):
@@ -2556,11 +2713,12 @@ def note_delete(ids):
                 raise RuntimeError(r.get("description") or "删除失败")
             tag = str((r.get("data") or {}).get("tag") or tag)
         done.append(nid)
+    _notes_touch(drop_ids=done)      # 列表缓存里也删掉，不用等整表刷新
     return {"deleted": done}
 
 
 # ---------------------------------------------------------------- 代办
-TODO_CACHE = {"at": 0, "items": []}
+TODO_CACHE = {"at": 0, "items": [], "sync": None}
 TODO_RAW = {}                       # tid -> 原始记录（带 eTag），改/删时直接用
 TODO_FETCH_LOCK = threading.Lock()  # 同时只允许一个完整拉取
 TODO_REFRESH_AFTER = 300            # 缓存超过 5 分钟就在后台刷一次
@@ -2588,6 +2746,7 @@ def _todo_cache_save():
                            "items": TODO_CACHE.get("items") or [],
                            "maxId": TODO_CACHE.get("maxId"),
                            "maxSort": TODO_CACHE.get("maxSort"),
+                           "sync": TODO_CACHE.get("sync"),
                            "raw": TODO_RAW or {}},
                           ensure_ascii=False).encode("utf-8")
         data = dpapi_protect(blob)
@@ -2648,11 +2807,14 @@ def _todo_fetch_all(min_at=0):
     只有没缓存/强制刷新/后台预热才走这里。
     """
     with TODO_FETCH_LOCK:
-        # 等锁期间别的线程已经刷完了，直接用，不重复拉一遍
-        if TODO_CACHE["items"] and (TODO_CACHE.get("at") or 0) > min_at:
+        # 等锁期间别的线程已经刷完了，直接用，不重复拉一遍。
+        # 注意 min_at 为 0 表示「用户手动刷新/首次加载」，必须真的去拉一次；
+        # 以前这里写的是 at > 0，导致 ?refresh=1 永远命中缓存、新代办刷不出来。
+        if min_at and TODO_CACHE["items"] and (TODO_CACHE.get("at") or 0) > min_at:
             return TODO_CACHE["items"]
         out, seen, token, guard = [], set(), None, 0
         max_id, max_sort = 0, 0
+        last_token = None
         raw = {}
         while True:
             params = {"limit": 200}
@@ -2685,6 +2847,8 @@ def _todo_fetch_all(min_at=0):
                 except Exception:
                     pass
             nxt = d.get("syncToken")
+            if isinstance(nxt, dict):
+                last_token = nxt
             guard += 1
             if not d.get("hasMore") or not fresh or not isinstance(nxt, dict) or guard > 30:
                 break
@@ -2693,13 +2857,138 @@ def _todo_fetch_all(min_at=0):
             token = nxt
         out.sort(key=lambda x: (x["done"], -(x["created"] or 0)))
         TODO_CACHE.update({"at": time.time(), "items": out,
-                           "maxId": max_id or None, "maxSort": max_sort or None})
+                           "maxId": max_id or None, "maxSort": max_sort or None,
+                           "sync": last_token})
         TODO_RAW.clear()
         TODO_RAW.update(raw)
         _todo_cache_save()
         print("[代办] 共 %d 条（未完成 %d）"
               % (len(out), sum(1 for x in out if not x["done"])))
         return out
+
+
+def _todo_ensure_cache():
+    """把盘上的待办缓存读进内存（服务刚启动时 sync 也要先有 items 和游标）。"""
+    if TODO_CACHE["items"]:
+        return
+    o = _todo_cache_load()
+    if o and o.get("items"):
+        TODO_CACHE.update({"at": float(o.get("at") or 0),
+                           "items": o["items"],
+                           "maxId": o.get("maxId"),
+                           "maxSort": o.get("maxSort"),
+                           "sync": o.get("sync")})
+        if isinstance(o.get("raw"), dict):
+            TODO_RAW.clear()
+            TODO_RAW.update(o["raw"])
+
+
+def todo_sync():
+    """按上次全量拉取留下的 syncToken，只取「之后的变化」。
+
+    返回 (items, changed)：
+      - 没有游标（老缓存/第一次启动）→ (None, 0)，调用方走全量；
+      - 有游标 → 新代办、改过的、删掉的都合并进缓存，返回完整列表 + 变化条数。
+
+    一次请求通常几百毫秒。切回代办页签时用它保证看到的是最新数据，
+    不用每次都等 17 页全量拉取。
+    """
+    tok = TODO_CACHE.get("sync")
+    if not tok or not TODO_CACHE["items"]:
+        _todo_ensure_cache()
+        tok = TODO_CACHE.get("sync")
+    if not tok or not TODO_CACHE["items"]:
+        return None, 0
+    by_id = {str(x.get("id")): x for x in TODO_CACHE["items"]}
+    changed = 0
+    token = tok
+    last = tok
+    guard = 0
+    max_id = int(TODO_CACHE.get("maxId") or 0)
+    max_sort = int(TODO_CACHE.get("maxSort") or 0)
+    try:
+        while True:
+            j = api_get("/todo/v1/user/records", limit=200,
+                        syncToken=json.dumps(token, separators=(",", ":")))
+            d = j.get("data") or {}
+            recs = d.get("records") or []
+            for r in recs:
+                cj = r.get("contentJson") or {}
+                ent = cj.get("entity") or {}
+                tid = str(ent.get("syncId") or r.get("id") or "")
+                if not tid:
+                    continue
+                if r.get("status") not in (None, "normal"):
+                    # 删掉的：从本地列表里也拿掉
+                    if tid in by_id:
+                        del by_id[tid]
+                        changed += 1
+                    TODO_RAW.pop(tid, None)
+                    continue
+                it = _todo_parse(ent)
+                it["id"] = tid
+                if by_id.get(tid) != it:
+                    by_id[tid] = it
+                    changed += 1
+                TODO_RAW[tid] = r
+                try:
+                    max_id = max(max_id, int(ent.get("id")))
+                except Exception:
+                    pass
+                try:
+                    max_sort = max(max_sort, int(ent.get("customSortId")))
+                except Exception:
+                    pass
+            nxt = d.get("syncToken")
+            if isinstance(nxt, dict):
+                last = nxt
+            guard += 1
+            if (not d.get("hasMore") or not isinstance(nxt, dict)
+                    or nxt == token or guard > 10):
+                break
+            token = nxt
+    except Exception as e:
+        print("[代办] 增量同步失败：%s %s" % (type(e).__name__, e))
+        return None, 0
+    if not changed:
+        # 兜底：有些客户端新建的代办 syncToken 不一定会带出来，
+        # 再取第一页（最新 100 条，约 0.3 秒）看有没有没见过的新条目。
+        try:
+            j = api_get("/todo/v1/user/records", limit=100)
+            d = j.get("data") or {}
+            for r in d.get("records") or []:
+                if r.get("status") not in (None, "normal"):
+                    continue
+                ent = (r.get("contentJson") or {}).get("entity") or {}
+                tid = str(ent.get("syncId") or r.get("id") or "")
+                if not tid or tid in by_id:
+                    continue
+                it = _todo_parse(ent)
+                it["id"] = tid
+                by_id[tid] = it
+                TODO_RAW[tid] = r
+                changed += 1
+                try:
+                    max_id = max(max_id, int(ent.get("id")))
+                except Exception:
+                    pass
+                try:
+                    max_sort = max(max_sort, int(ent.get("customSortId")))
+                except Exception:
+                    pass
+        except Exception as e:
+            print("[代办] 首页兜底检查失败：%s %s" % (type(e).__name__, e))
+    if changed:
+        out = list(by_id.values())
+        out.sort(key=lambda x: (x["done"], -(x["created"] or 0)))
+        TODO_CACHE.update({"items": out,
+                           "maxId": max_id or None,
+                           "maxSort": max_sort or None})
+    TODO_CACHE["sync"] = last
+    TODO_CACHE["at"] = time.time()
+    if changed or last != tok:
+        _todo_cache_save()
+    return TODO_CACHE["items"], changed
 
 
 def _todo_refresh_bg():
@@ -2730,7 +3019,8 @@ def todo_list(force=False, since=0):
             TODO_CACHE.update({"at": float(o.get("at") or 0),
                                "items": o["items"],
                                "maxId": o.get("maxId"),
-                               "maxSort": o.get("maxSort")})
+                               "maxSort": o.get("maxSort"),
+                               "sync": o.get("sync")})
             if isinstance(o.get("raw"), dict):
                 TODO_RAW.clear()
                 TODO_RAW.update(o["raw"])
@@ -4216,7 +4506,8 @@ class Handler(BaseHTTPRequestHandler):
             if u.path == "/api/reverse_geo":
                 return self._json(reverse_geo(q.get("lat"), q.get("lon")))
             if u.path == "/api/notes":
-                return self._json(notes_v2())
+                # refresh=1 才同步拉云端；平时直接回本地缓存（进页签秒出）
+                return self._json(notes_v2(force=(q.get("refresh") == "1")))
             if u.path == "/api/note":
                 return self._json(note_detail(q["id"]))
             if u.path == "/api/note_img":
@@ -4237,6 +4528,12 @@ class Handler(BaseHTTPRequestHandler):
                     since = float(q.get("since") or 0)
                 except ValueError:
                     since = 0
+                if q.get("sync") == "1":
+                    # 增量同步：只拉上次之后的变化，切页签时用，几百毫秒
+                    items, changed = todo_sync()
+                    return self._json({"todos": items,
+                                       "at": TODO_CACHE.get("at") or 0,
+                                       "changed": changed})
                 return self._json({"todos": todo_list(q.get("refresh") == "1", since),
                                    "at": TODO_CACHE.get("at") or 0})
             if u.path == "/api/video_start":
@@ -4950,6 +5247,28 @@ def _months_via(group_id, sess):
     return out
 
 
+def _style_native_titlebar(win):
+    """Windows 11：把系统标题栏染成和页面同一块深色玻璃，避免顶上一条灰杠。"""
+    if os.name != 'nt':
+        return
+    try:
+        import ctypes
+        hwnd = int(win.native.Handle.ToInt64())
+        dwm = ctypes.windll.dwmapi.DwmSetWindowAttribute
+        def set_attr(attr, value):
+            try:
+                dwm(hwnd, ctypes.c_int(attr), ctypes.byref(ctypes.c_int(value)), 4)
+            except Exception:
+                pass
+        # COLORREF: 0x00BBGGRR，不是 RGB 直填
+        set_attr(20, 1)                 # 沉浸式深色
+        set_attr(35, 0x00160E0A)        # 标题栏底色 #0A0E16
+        set_attr(36, 0x00FAF5F2)        # 标题文字 #F2F5FA
+        set_attr(34, 0x00160E0A)        # 边框同色
+    except Exception:
+        pass
+
+
 def main():
     global WV_CDP_PORT
     print("=" * 56)
@@ -4997,9 +5316,10 @@ def main():
     threading.Thread(target=_prewarm_timeline, daemon=True).start()
     threading.Thread(target=_prewarm_todos, daemon=True).start()
 
-    webview.create_window("小米云", "http://127.0.0.1:%d/" % port,
-                          width=1280, height=820, min_size=(980, 640),
-                          text_select=True)      # 允许选中/复制便签正文
+    win = webview.create_window("小米云", "http://127.0.0.1:%d/" % port,
+                                width=1280, height=820, min_size=(980, 640),
+                                text_select=True)      # 允许选中/复制便签正文
+    win.events.loaded += lambda *_: _style_native_titlebar(win)
     # 窗口/任务栏图标：和 exe 图标、界面左上角 logo 用同一张 app.ico
     icon = os.path.join(res_dir(), "app.ico")
     # storage_path 固定下来：不用每次新建一个临时目录，退出时 pywebview
