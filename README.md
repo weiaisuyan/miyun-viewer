@@ -30,7 +30,7 @@
 - Windows 10/11（WebView2 Runtime，Win11 自带）
 - Python 3.12
 - 可选：ffmpeg（录音转码 / 视频探测）。放在程序目录、PATH，或设置 `MIYUN_FFMPEG` 指向 exe。
-- 可选：代理。设置 `MIYUN_PROXY=http://127.0.0.1:7897`（按你的实际代理改）。
+- 可选：代理。设置 `MIYUN_PROXY=http://127.0.0.1:7890`（按你的实际代理改）。
 
 ## 运行（源码）
 
