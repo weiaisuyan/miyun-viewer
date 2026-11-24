@@ -2364,12 +2364,174 @@ header #btnNew{min-width:0}
   *{animation-duration:.001ms !important;animation-iteration-count:1 !important;
     transition-duration:.001ms !important;scroll-behavior:auto !important}
 }
+
+/* ============================================================
+   体验增强层（只新增，不改上面的既有规则）
+   ============================================================ */
+/* 顶栏搜索：默认 210px，聚焦展开到 280px；小屏收窄 */
+#searchWrap{display:flex;align-items:center;gap:6px;height:29px;flex:none;width:210px;
+  padding:0 7px 0 9px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface-2);
+  transition:width .18s var(--ease-out),border-color .18s var(--ease),background .18s,box-shadow .18s}
+#searchWrap:focus-within{width:282px;border-color:var(--accent-line);background:var(--surface-3);
+  box-shadow:0 0 0 3px var(--accent-weak)}
+#searchWrap svg.i{width:13px;height:13px;color:var(--fg-4);flex:none}
+#searchWrap:focus-within svg.i{color:var(--accent)}
+#searchInp{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--fg);
+  font-family:inherit;font-size:12.5px;line-height:1}
+#searchInp::placeholder{color:var(--fg-4)}
+#searchClr{display:none;flex:none;width:17px;height:17px;border:0;border-radius:50%;
+  background:var(--surface-4);color:var(--fg-3);font-size:12px;line-height:1;cursor:pointer;padding:0}
+#searchWrap.has #searchClr{display:block}
+#searchClr:hover{background:var(--line-3);color:var(--fg)}
+@media (max-width:1180px){ #searchWrap{width:150px} #searchWrap:focus-within{width:210px} }
+
+/* 键盘焦点环：只在键盘操作时出现，鼠标点击不受影响 */
+:where(button,a,input,textarea,select,[tabindex]):focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px}
+.btn:focus-visible,.iconbtn:focus-visible{border-radius:8px}
+#searchInp:focus-visible{outline:none}
+.card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.srch-hit{outline:1px solid var(--accent-line);outline-offset:-1px}
+
+/* 按压反馈：图标按钮、导航、勾选框轻微回弹 */
+.iconbtn:active,.nav:active,.chip:active,.tick:active,.tick2:active{transform:scale(.945)}
+.card:active{transform:scale(.984)}
+.row:active{transform:none}
+#selbar,.tick,.tick2,.card,.iconbtn,.nav,.chip{transform-origin:center}
+#selbar{will-change:transform}
+
+/* 滚动时上下边缘渐隐（JS 在滚动开始/结束时切 .scrollfade） */
+#content.scrollfade{-webkit-mask-image:linear-gradient(180deg,transparent 0,#000 12px,
+  #000 calc(100% - 14px),transparent 100%);
+  mask-image:linear-gradient(180deg,transparent 0,#000 12px,#000 calc(100% - 14px),transparent 100%)}
+
+/* 网络状态条 */
+#netBar{position:fixed;left:0;right:0;top:0;height:0;overflow:hidden;z-index:90;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  font-size:11.5px;letter-spacing:.02em;color:#f0c674;
+  background:rgba(226,168,61,.12);border-bottom:1px solid rgba(226,168,61,.26);
+  transition:height .2s var(--ease)}
+#netBar.on{height:26px}
+#netBar svg.i{width:13px;height:13px}
+
+/* Toast 三态：成功 / 失败 / 进行中 */
+#toast.ok{border-color:rgba(63,191,127,.45);box-shadow:0 0 0 1px rgba(63,191,127,.08),var(--shadow-2)}
+#toast.err{border-color:rgba(242,99,122,.52);box-shadow:0 0 0 1px rgba(242,99,122,.10),var(--shadow-2)}
+#toast.busy{border-color:rgba(91,141,255,.52);box-shadow:0 0 0 1px rgba(91,141,255,.10),var(--shadow-2)}
+#toast .tdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;
+  vertical-align:1px;background:var(--fg-3);flex:none}
+#toast.ok .tdot{background:var(--ok)}
+#toast.err .tdot{background:var(--danger)}
+#toast.busy .tdot{background:var(--accent);animation:pulse 1.1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* 云盘排序按钮：面包屑右侧，点一下循环 名称→时间→大小 */
+#crumb .sortb{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 8px;
+  margin-left:6px;border:1px solid var(--line-2);border-radius:6px;background:var(--surface-2);
+  color:var(--fg-3);font-family:inherit;font-size:11px;cursor:pointer}
+#crumb .sortb:hover{color:var(--fg);border-color:var(--line-3);background:var(--surface-3)}
+#crumb .sortb svg.i{width:12px;height:12px}
+
+/* 查看器打开转场：舞台轻微放大淡入（关闭时本来就有飞回缩略图的动画） */
+@keyframes vStageIn{from{transform:scale(.962);opacity:.35}to{transform:scale(1);opacity:1}}
+#viewer.opening .stage{animation:vStageIn .28s var(--ease-out)}
+
+/* 笔记全屏写作 + 编辑器页脚 */
+#noteReader.writing{position:fixed;inset:0;z-index:62;background:var(--bg);
+  box-shadow:0 0 0 1px var(--line)}
+#noteEdit .efoot{flex:none;display:flex;align-items:center;gap:8px;
+  padding:7px 18px 10px;border-top:1px solid var(--line);color:var(--fg-4);font-size:11px}
+#noteEdit .efoot .esep{opacity:.45}
+
+/* 待办：快速添加 + 批量条 + 行内多选框 */
+#todoTools{display:flex;align-items:center;gap:10px;margin:0 20px 12px;flex-wrap:wrap}
+#todoQuick{flex:1;min-width:230px;display:flex;align-items:center;gap:8px;height:38px;
+  padding:0 8px 0 11px;border:1px solid var(--line-2);border-radius:10px;background:var(--surface-2);
+  transition:border-color .15s,background .15s,box-shadow .15s}
+#todoQuick:focus-within{border-color:var(--accent-line);background:var(--surface-3);
+  box-shadow:0 0 0 3px var(--accent-weak)}
+#todoQuick svg.i{width:14px;height:14px;color:var(--fg-4);flex:none}
+#todoQuick:focus-within svg.i{color:var(--accent)}
+#todoQuickInp{flex:1;min-width:0;border:0;outline:0;background:none;color:var(--fg);
+  font-family:inherit;font-size:13px}
+#todoQuickInp::placeholder{color:var(--fg-4)}
+#todoBatch{display:flex;align-items:center;gap:7px;opacity:0;pointer-events:none;
+  transition:opacity .15s var(--ease)}
+#todoBatch.on{opacity:1;pointer-events:auto}
+#todoBatchCnt{color:var(--fg-3);font-size:11.5px;white-space:nowrap}
+.todo .tck{width:18px;height:18px;flex:none;margin-top:1px;border-radius:5px;
+  border:1px solid var(--line-2);display:grid;place-items:center;color:transparent;opacity:.5;
+  cursor:pointer;transition:opacity .13s,background .13s,border-color .13s,transform .1s}
+.todo .tck svg{width:11px;height:11px;stroke-width:3}
+.todo:hover .tck{opacity:1}
+.todo .tck.on{background:var(--accent);border-color:var(--accent);color:#fff;opacity:1}
+.todo.sel{background:var(--accent-weak);border-color:var(--accent-line)}
+
+/* 录音日期分组头 + 倍速按钮 */
+.recday{padding:13px 2px 5px;color:var(--fg-3);font-size:11px;letter-spacing:.05em;
+  font-weight:600;user-select:none}
+.recday:first-child{padding-top:4px}
+.item .player .spd{flex:none;height:20px;min-width:28px;padding:0 5px;border-radius:5px;
+  border:1px solid var(--line-3);background:transparent;color:var(--fg-3);
+  font-family:inherit;font-size:10.5px;cursor:pointer;line-height:1}
+.item .player .spd:hover{color:var(--fg);border-color:var(--accent-line);background:var(--accent-weak)}
+.item .player .spd.on{color:#fff;border-color:var(--accent);background:var(--accent-weak)}
+
+/* 拖动框选 */
+#marquee{position:fixed;display:none;border:1px solid var(--accent-line);
+  background:rgba(91,141,255,.10);border-radius:4px;pointer-events:none;z-index:6}
+
+/* 启动闪屏 */
+#splash{position:fixed;inset:0;z-index:99;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  transition:opacity .45s var(--ease),visibility .45s}
+#splash .smark{width:62px;height:62px;border-radius:18px;display:grid;place-items:center;
+  background:linear-gradient(145deg,#1d2530,#11161d);border:1px solid var(--line-2);
+  box-shadow:0 18px 50px -18px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.06)}
+#splash .smark svg.i{width:30px;height:30px;color:var(--accent);stroke-width:1.3}
+#splash .st{font-size:13px;color:var(--fg-2);letter-spacing:.16em}
+#splash .sline{width:150px;height:2px;border-radius:2px;background:var(--surface-4);overflow:hidden}
+#splash .sline i{display:block;width:34%;height:100%;background:var(--accent);border-radius:2px;
+  animation:indet 1.25s ease-in-out infinite}
+#splash.off{opacity:0;visibility:hidden;pointer-events:none}
+
+/* 命令面板 */
+#cmdk{position:fixed;inset:0;z-index:94;display:none;align-items:flex-start;justify-content:center;
+  background:rgba(4,6,10,.52);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
+  padding-top:13vh}
+#cmdk.on{display:flex}
+#cmdk .cb{width:min(560px,88vw);background:var(--glass-2);border:1px solid var(--glass-line);
+  border-radius:15px;box-shadow:var(--shadow-3);overflow:hidden;
+  animation:cmdkIn .18s var(--ease-out)}
+@keyframes cmdkIn{from{opacity:0;transform:translateY(-8px) scale(.985)}to{opacity:1;transform:none}}
+#cmdk .cin{display:flex;align-items:center;gap:9px;padding:13px 15px;
+  border-bottom:1px solid var(--line-2)}
+#cmdk .cin svg.i{width:15px;height:15px;color:var(--fg-4);flex:none}
+#cmdk #cmdkInp{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--fg);
+  font-family:inherit;font-size:14px}
+#cmdk #cmdkInp::placeholder{color:var(--fg-4)}
+#cmdk .clist{max-height:52vh;overflow:auto;padding:6px}
+#cmdk .ci{display:flex;align-items:center;gap:10px;height:38px;padding:0 11px;border-radius:9px;
+  color:var(--fg);cursor:pointer;font-size:13px}
+#cmdk .ci svg.i{width:15px;height:15px;color:var(--fg-3);flex:none}
+#cmdk .ci .k{margin-left:auto;color:var(--fg-4);font-size:11px;letter-spacing:.04em}
+#cmdk .ci.act{background:var(--accent-weak);color:#fff}
+#cmdk .ci.act svg.i{color:var(--accent)}
+#cmdk .cempty{padding:26px;text-align:center;color:var(--fg-4);font-size:12.5px}
+
+@media (prefers-reduced-motion:reduce){
+  #content.scrollfade{-webkit-mask-image:none;mask-image:none}
+  #splash,#cmdk .cb{animation:none;transition:none}
+}
 </style>
 </head>
 <body>
 
 <!-- 环境光：给毛玻璃提供可透、可糊的底。极暗，只负责一层空气感。 -->
 <div id="ambient" aria-hidden="true"><i class="a1"></i><i class="a2"></i><i class="a3"></i></div>
+
+<!-- 网络状态条：断网时从顶部滑出，不占布局高度 -->
+<div id="netBar"><svg class="i"><use href="#i-cloud"/></svg><span id="netBarText">网络已断开 · 正在使用本地缓存</span></div>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-photo" viewBox="0 0 24 24">
@@ -2441,6 +2603,18 @@ header #btnNew{min-width:0}
     <path d="M4 7.5h8.4M17.4 7.5H20M4 16.5h3.4M12.4 16.5H20"/>
     <circle cx="15" cy="7.5" r="2.1"/>
     <circle cx="10" cy="16.5" r="2.1"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24">
+    <circle cx="10.8" cy="10.8" r="6.4"/><path d="M15.6 15.6l4.3 4.3"/></symbol>
+  <symbol id="i-sort" viewBox="0 0 24 24">
+    <path d="M7 4.6v14.8M3.8 16.2L7 19.4l3.2-3.2M12 7h8.2M12 12h5.6M12 17h3"/></symbol>
+  <symbol id="i-command" viewBox="0 0 24 24">
+    <path d="M9 9h6v6H9z"/><path d="M9 9H6.6a2.1 2.1 0 112.1-2.1V9M15 9h2.4a2.1 2.1 0 10-2.1-2.1V9
+      M9 15v2.4a2.1 2.1 0 10-2.1 2.1V15M15 15h2.4a2.1 2.1 0 11-2.1 2.1V15"/></symbol>
+  <symbol id="i-txt" viewBox="0 0 24 24">
+    <path d="M5 5h14M12 5v14M8.6 19h6.8"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24">
+    <path d="M2.8 12s3.4-5.6 9.2-5.6S21.2 12 21.2 12s-3.4 5.6-9.2 5.6S2.8 12 2.8 12z"/>
+    <circle cx="12" cy="12" r="2.6"/></symbol>
 </svg>
 
 <aside id="side">
@@ -2475,6 +2649,11 @@ header #btnNew{min-width:0}
       <span class="sub" id="sub"></span>
     </div>
     <span class="spacer"></span>
+    <div id="searchWrap">
+      <svg class="i"><use href="#i-search"/></svg>
+      <input id="searchInp" type="text" placeholder="搜索" autocomplete="off" spellcheck="false">
+      <button id="searchClr" title="清空搜索">×</button>
+    </div>
     <div class="hacts">
       <button class="btn primary sm" id="btnNew" style="display:none">新建</button>
       <button class="btn outline sm" id="btnTrash" style="display:none" title="回收站">回收站</button>
@@ -2627,6 +2806,24 @@ header #btnNew{min-width:0}
   </div>
 </div></div>
 
+<!-- 启动闪屏：登录状态确认后淡出；出错时 5 秒兜底自愈，不挡操作 -->
+<div id="splash">
+  <div class="smark"><svg class="i"><use href="#i-cloud"/></svg></div>
+  <div class="st">小米云</div>
+  <div class="sline"><i></i></div>
+</div>
+
+<!-- 命令面板（Ctrl+K） -->
+<div id="cmdk"><div class="cb">
+  <div class="cin"><svg class="i"><use href="#i-command"/></svg>
+    <input id="cmdkInp" type="text" placeholder="跳转页面、执行操作 …" autocomplete="off" spellcheck="false">
+  </div>
+  <div class="clist" id="cmdkList"></div>
+</div></div>
+
+<!-- 拖动框选 -->
+<div id="marquee"></div>
+
 <script>
 /* ============ 基础 ============ */
 const $ = s => document.querySelector(s);
@@ -2674,11 +2871,16 @@ function toast(msg, opt){
   msg = String(msg == null ? '' : msg);
   if(opt && opt.quiet) return;
   const now = Date.now();
+  const type = (opt && opt.type) || '';      // ok / err / busy（不传＝中性）
   /* 同一句话 2 秒内不重复弹；后台轮询/自动刷新用 quiet 直接静默 */
   if(msg === toastLast && now - toastLastAt < 2000) return;
   toastLast = msg; toastLastAt = now;
-  const t=$('#toast'); t.textContent=msg; placeToast(); t.classList.add('on');
-  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),1800);
+  const t=$('#toast');
+  t.innerHTML = (type ? '<span class="tdot"></span>' : '') + esc(msg);
+  t.className = type ? ('on ' + type) : 'on';
+  placeToast();
+  clearTimeout(toastT);
+  toastT=setTimeout(()=>t.classList.remove('on'), type === 'err' ? 2600 : 1800);
 }
 window.addEventListener('resize', () => {
   const t = $('#toast');
@@ -2686,14 +2888,31 @@ window.addEventListener('resize', () => {
 });
 
 async function api(p, opt){
-  const r = await fetch(p, opt);
-  const j = await r.json().catch(() => ({}));
-  // 403 strongauth：会话没坏，只是这个服务（比如待办）要更强的身份验证。
-  // 不能走 relogin，否则整个界面会被拖到扫码页、还在那儿死循环。
-  if (r.status === 403 && j.error === 'strongauth') throw new Error('strongauth');
-  if (r.status === 401) { relogin(); throw new Error('auth'); }
-  if (r.status >= 500) throw new Error(j.msg || j.error || 'server');
-  return j;
+  const method = String((opt && opt.method) || 'GET').toUpperCase();
+  const isGet = method === 'GET';
+  const tries = isGet ? 2 : 1;               // GET 遇网络抖动静默重试一次；写操作绝不重放
+  let lastErr = null;
+  for(let attempt = 0; attempt < tries; attempt++){
+    try{
+      const r = await fetch(p, opt);
+      const j = await r.json().catch(() => ({}));
+      // 403 strongauth：会话没坏，只是这个服务（比如待办）要更强的身份验证。
+      // 不能走 relogin，否则整个界面会被拖到扫码页、还在那儿死循环。
+      if (r.status === 403 && j.error === 'strongauth') throw new Error('strongauth');
+      if (r.status === 401) { relogin(); throw new Error('auth'); }
+      if (r.status >= 500) throw new Error(j.msg || j.error || 'server');
+      return j;
+    }catch(e){
+      lastErr = e;
+      const m = String((e && e.message) || '');
+      if(attempt + 1 < tries && m !== 'auth' && m !== 'strongauth'){
+        await new Promise(res => setTimeout(res, 420));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr || new Error('server');
 }
 
 /* 把内部错误码翻成人话；strongauth 只影响需要强身份的服务（待办） */
@@ -2724,7 +2943,12 @@ const state={items:[],records:[],driveItems:[],notes:[],folders:[],albums:[],vid
              layout:null,todos:null,todoView:null,canSel:false,selHint:'',
              // 云盘视图：list（列表）/ grid（网格）。记住上次的选择
              driveView: (()=>{ try{ return localStorage.getItem('driveView')||'list'; }
-                               catch(_){ return 'list'; } })()};
+                               catch(_){ return 'list'; } })(),
+             // 云盘排序：按名称/时间/大小，循环切换，记住上次
+             driveSortIdx: (()=>{ try{
+                 const i = Number(localStorage.getItem('driveSortIdx'));
+                 return (i >= 0 && i < 6) ? i : 0;
+               }catch(_){ return 0; } })()};
 
 /* ============ 侧栏拖拽调宽 ============ */
 (function bindSideResize(){
@@ -2893,8 +3117,10 @@ $$('.nav').forEach(n=>n.onclick=()=>{
   }
   if(!leaveEditorIfNeeded()) return;           // 笔记编辑中切页签先确认，别丢草稿
   saveCurrentTabState();
+  if(window.UX) uxSaveScroll();
   $$('.nav').forEach(x=>x.classList.toggle('on',x===n));
   TAB=n.dataset.tab;
+  if(window.UX){ UX.q = ''; uxSearchHint(); }
   moveNavPill();
   renderTab();
 });
@@ -3519,6 +3745,11 @@ function albumRowHTML(a, inFold){
 
 function drawAlbums(){
   const g = albumGroups(), lay = state.layout;
+  const q = uxNorm((window.UX && UX.q) || '').trim();
+  if(q){
+    g.normal = g.normal.filter(a => uxNorm(a.name).indexOf(q) >= 0);
+    g.folded = g.folded.filter(a => uxNorm(a.name).indexOf(q) >= 0);
+  }
   const photosOpen = lay.photosOpen !== false;
   const videoOn = !!state.videoOnly;
   const trashOn = !!state.trashView;
@@ -4560,7 +4791,7 @@ function cardHTML(it){
     <div class="ph"></div>
     ${it.thumbUrl?`<img loading="lazy" decoding="async" src="${esc(it.thumbUrl)}" alt=""
         draggable="true" onload="imgOk(this)" onerror="imgFail(this)">`:''}
-    ${isVid?`<span class="vt">${ICO('i-play','fill')}视频</span>`:''}
+    ${isVid?`<span class="vt">${ICO('i-play','fill')}视频${it.dur? ' '+fmtClock(it.dur) : ''}</span>`:''}
     <span class="tick" role="checkbox" aria-checked="${sel.has(it.id)}" title="选择">${ICO('i-check')}</span>
     ${cardMetaHTML(it)}</div>`;
 }
@@ -4591,8 +4822,19 @@ function bindCards(){
     };
     c.addEventListener('keydown', e => {
       const it = get(); if(!it) return;
-      if(e.key === ' '){ e.preventDefault(); toggleSelById(it.id, c); }
-      else if(e.key === 'Enter'){ e.preventDefault(); openViewer(it); }
+      if(e.key === ' '){ e.preventDefault(); toggleSelById(it.id, c); return; }
+      if(e.key === 'Enter'){ e.preventDefault(); openViewer(it); return; }
+      if(e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown'){
+        e.preventDefault();
+        const all = $$('#content .card[data-key]');
+        const idx = all.indexOf(c);
+        if(idx < 0) return;
+        const per = (gal.geo && gal.geo.perRow) ? gal.geo.perRow : 1;
+        const step = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1
+                   : e.key === 'ArrowUp' ? -per : per;
+        const t = all[idx + step];
+        if(t){ t.focus(); t.scrollIntoView({block:'nearest'}); }
+      }
     });
     const it0 = get();
     const img = c.querySelector('img');
@@ -4903,7 +5145,13 @@ async function renderNotes(opt){
 
 function filteredNotes(){
   const v = state.noteView || {folder:'all'};
-  return v.folder==='all' ? state.notes : state.notes.filter(n=>n.folder===v.folder);
+  const q = uxNorm((window.UX && UX.q) || '').trim();
+  let list = v.folder==='all' ? state.notes : state.notes.filter(n=>n.folder===v.folder);
+  if(q){
+    list = list.filter(n =>
+      uxNorm(n.title).indexOf(q) >= 0 || uxNorm(n.preview).indexOf(q) >= 0);
+  }
+  return list;
 }
 
 function drawNoteFilters(){
@@ -5409,11 +5657,13 @@ function dropNoteDraft(id){
 function leaveNoteEditor(){
   const r = $('#noteReader');
   if(r){
+    r.classList.remove('writing');
     r.style.display = '';
     r.style.flexDirection = '';
     r.style.overflow = 'auto';
     r.innerHTML = '';
   }
+  const nl = $('#noteList'); if(nl) nl.style.display = '';
   $('#left').style.display = 'none';
 }
 
@@ -5446,6 +5696,8 @@ function openNoteEditor(note){
     <div class="ehead">
       <input id="neTitle" type="text" placeholder="标题" value="${esc(draft ? (draft.title||'') : (n.title||''))}">
       <span class="dirty" id="neDirty" style="display:none">未保存</span>
+      <button class="btn sm ghost" id="neFull" title="全屏写作（Esc 退出）">全屏</button>
+      <button class="btn sm ghost" id="neExport" title="导出为 Markdown 文件">导出</button>
       <button class="btn sm outline" id="neClose">取消</button>
       <button class="btn sm primary" id="neSave">保存</button>
     </div>
@@ -5454,6 +5706,8 @@ function openNoteEditor(note){
       : `<button data-md="${t[0]}" title="${t[2]}">${t[1]}</button>`).join('')}</div>
     <div class="esingle"><div id="neBody" contenteditable="true" spellcheck="false"
       data-ph="写点什么…"></div></div>
+    <div class="efoot"><span id="neCount">0 字</span><span class="esep">·</span>
+      <span id="neAuto">自动暂存已开启</span></div>
   </div>`;
   r.scrollTop = 0;
 
@@ -5486,6 +5740,56 @@ function openNoteEditor(note){
     }
   });
   hookSave(ed); hookSave(titleIn);
+
+  /* 字数统计 + 1.5 秒自动暂存：只写本机草稿，不碰云端 */
+  let autoT = null;
+  const paintCount = () => {
+    const c = $('#neCount');
+    if(!c) return;
+    const n = (ed.textContent || '').replace(/\s+/g, '').length;
+    c.textContent = n + ' 字';
+  };
+  paintCount();
+  const autoStage = () => {
+    clearTimeout(autoT);
+    autoT = setTimeout(() => {
+      if(!editorDirty) return;
+      writeNoteDraft(editingNoteId, titleIn.value, htmlToMd(ed));
+      setDirtyTag('已自动暂存');
+    }, 1500);
+  };
+  ed.addEventListener('input', () => { paintCount(); autoStage(); });
+  titleIn.addEventListener('input', autoStage);
+  ed.addEventListener('blur', () => {
+    clearTimeout(autoT);
+    if(editorDirty) writeNoteDraft(editingNoteId, titleIn.value, htmlToMd(ed));
+  });
+
+  /* 全屏写作：只隐藏左侧列表，不调系统全屏，退出时原样恢复 */
+  const fullBtn = $('#neFull');
+  if(fullBtn) fullBtn.onclick = () => {
+    const r2 = $('#noteReader');
+    const on = !r2.classList.contains('writing');
+    r2.classList.toggle('writing', on);
+    const nl = $('#noteList');
+    if(nl) nl.style.display = on ? 'none' : '';
+    fullBtn.textContent = on ? '退出全屏' : '全屏';
+    if(on) ed.focus();
+  };
+
+  /* 导出 Markdown：标题 + 正文，文件名去掉非法字符 */
+  const exBtn = $('#neExport');
+  if(exBtn) exBtn.onclick = () => {
+    const title = (titleIn.value || '').trim() || '未命名笔记';
+    const md = `# ${title}\n\n${htmlToMd(ed)}`;
+    const blob = new Blob([md], {type:'text/markdown;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = title.replace(/[\\/:*?"<>|]/g, '_').slice(0, 60) + '.md';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+    toast('已导出 Markdown', {type:'ok'});
+  };
   // 粘贴清洗：外部富文本先转 Markdown 再渲染回来，只保留我们支持的格式
   ed.addEventListener('paste', e => {
     const dt = e.clipboardData || window.clipboardData;
@@ -5612,6 +5916,8 @@ function todoRow(t){
     <div class="tx"><span class="ttl" title="${esc(t.title)}">${esc(t.title)}</span>
       ${subs?`<div class="sub">${subs}</div>`:''}</div>
     <span class="dt">${t.done ? (t.finished?fmtShort(t.finished):'已完成') : fmtShort(t.created)}</span>
+    <span class="tck" data-id="${esc(t.id)}" role="checkbox" aria-checked="false"
+      title="选中后可批量完成或删除">${ICO('i-check')}</span>
     <div class="acts">
       <button class="edit" data-id="${esc(t.id)}" title="编辑这条代办">
         <svg class="i"><use href="#i-note"/></svg></button>
@@ -5800,8 +6106,10 @@ function drawTodoList(keepScroll){
   const isAll = view === 'all';
   const isDone = view === 'done';
   // 「全部」= 未完成在上、已完成在下，中间一条分隔
-  const list = isAll ? t.filter(x=>!x.done).concat(t.filter(x=>!!x.done))
-                     : t.filter(x=>!!x.done===isDone);
+  let list = isAll ? t.filter(x=>!x.done).concat(t.filter(x=>!!x.done))
+                   : t.filter(x=>!!x.done===isDone);
+  const q = uxNorm((window.UX && UX.q) || '').trim();
+  if(q) list = list.filter(x => uxNorm(uxTodoHay(x)).indexOf(q) >= 0);
   const doneN = t.filter(x=>!!x.done).length;
   const pages = Math.max(1, Math.ceil(list.length / TODO_PAGE_SIZE));
   const page = Math.min(Math.max(1, state.todoPage || 1), pages);
@@ -5827,12 +6135,14 @@ function drawTodoList(keepScroll){
     body = rows.map(todoRow).join('');
   }
   c.innerHTML = `<div id="todoWrap">
+    ${uxTodoToolsHTML()}
     <div id="todoBody">${body}</div>
     ${list.length?'':`<div class="empty" style="padding:30px"><div class="big2">${ICO(isDone?'i-check':'i-todo','xl')}</div>${isDone?'还没有已完成的代办':isAll?'还没有代办':'没有未完成的代办，全部清空'}</div>`}
     ${todoPagerHTML(view, list.length, page, pages)}
   </div>`;
   c.scrollTop = keepScroll ? top0 : 0;
   bindTodoList();
+  uxPaintTodoSel();
   $$('#todoPager .pg, #todoPager .pgbtn').forEach(b=>{
     if(b.disabled) return;
     b.onclick = () => {
@@ -5888,11 +6198,22 @@ function bindTodoList(){
             body:JSON.stringify({id:btn.dataset.id})});
           state.todos = (state.todos||[]).filter(x=>x.id!==btn.dataset.id);
           drawTodoFilters(); drawTodoList(true);
-          toast('已删除');
-        }catch(err){ toast('删除失败：' + (err.message||'')); }
+          toast('已删除', {type:'ok'});
+        }catch(err){ toast('删除失败：' + (err.message||''), {type:'err'}); }
       });
     };
   });
+  /* 多选框：点一下进入批量选择 */
+  $$('#todoBody .tck').forEach(t=>{
+    if(t.dataset.bound) return; t.dataset.bound='1';
+    t.onclick = e => {
+      e.stopPropagation();
+      const id = t.dataset.id;
+      if(UX.todoSel.has(id)) UX.todoSel.delete(id); else UX.todoSel.add(id);
+      uxPaintTodoSel();
+    };
+  });
+  uxBindTodoTools();
 }
 
 /* ---- 编辑代办：复用新建那个弹窗，但要带上已有的子项和完成状态 ---- */
@@ -5982,9 +6303,24 @@ function recordRowHTML(r){
       <button class="pp" title="播放">${ICO('i-play','fill')}</button>
       <span class="bar"><i></i></span>
       <span class="tm">${fmtClock(r.dur)}</span>
+      <button class="spd" title="播放速度">1x</button>
     </div>
     <button class="rec-del" data-id="${esc(r.id)}" title="删除这条录音">${ICO('i-close')}</button>
   </div>`;
+}
+
+/* 录音按天分组：同一天的录音归到一个日期头下面，翻长列表时能一眼看出时间 */
+function recordRowsGrouped(list){
+  let out = '', last = '';
+  (list || []).forEach(r => {
+    const day = r.date ? fmtDay(r.date) : '';
+    if(day && day !== last){
+      out += `<div class="recday">${esc(day)}</div>`;
+      last = day;
+    }
+    out += recordRowHTML(r);
+  });
+  return out;
 }
 
 async function renderRecords(force){
@@ -5996,7 +6332,7 @@ async function renderRecords(force){
     /* 上次已经加载过的列表先画出来：切回录音页签不再走一遍骨架 → 数据 */
     $('#content').innerHTML = `<div class="subhead"><span id="recCount"></span></div>
       <div class="lists" id="recList"></div>`;
-    $('#recList').innerHTML = state.records.map(recordRowHTML).join('');
+    $('#recList').innerHTML = recordRowsGrouped(state.records);
     $('#recCount').textContent = `全部录音 · ${state.records.length} 条`;
     bindRecords();
     setSentinel(state.ended ? '已经到底了' : '', false);
@@ -6029,7 +6365,7 @@ async function refreshRecordsQuiet(){
     state.ended = fresh.length < 100;
     const box = $('#recList');
     if(!box) return;
-    box.innerHTML = fresh.map(recordRowHTML).join('');
+    box.innerHTML = recordRowsGrouped(fresh);
     bindRecords();
     const rc = $('#recCount');
     if(rc) rc.textContent = `全部录音 · ${state.records.length} 条`;
@@ -6054,7 +6390,7 @@ async function recordsMore(){
     state.ended = records.length < 100;
     state.records.push(...records);
     $('#recList').querySelectorAll('.skrow').forEach(n=>n.remove());
-    $('#recList').insertAdjacentHTML('beforeend', records.map(recordRowHTML).join(''));
+    $('#recList').insertAdjacentHTML('beforeend', recordRowsGrouped(records));
     bindRecords();
     const rc = $('#recCount');
     if(rc) rc.textContent = `全部录音 · ${state.records.length} 条`;
@@ -6098,8 +6434,16 @@ function bindRecords(){
   $$('#recList .player').forEach(pl=>{
     if(pl.dataset.bound) return; pl.dataset.bound='1';
     const pp = pl.querySelector('.pp'), bar = pl.querySelector('.bar'),
-          fill = pl.querySelector('.bar i'), tm = pl.querySelector('.tm');
+          fill = pl.querySelector('.bar i'), tm = pl.querySelector('.tm'),
+          spd = pl.querySelector('.spd');
     let au = null;
+    let rate = Number(pl.dataset.rate || 1) || 1;
+    const paintRate = () => {
+      if(!spd) return;
+      spd.textContent = rate + 'x';
+      spd.classList.toggle('on', rate !== 1);
+    };
+    paintRate();
     const paint = () => {
       if(!au) return;
       const d = au.duration || 0, c = au.currentTime || 0;
@@ -6117,6 +6461,7 @@ function bindRecords(){
            注意这里不能在 play() 之前 await，否则可能丢掉这次点击的手势授权。 */
         au = new Audio('/api/record_audio?id=' + encodeURIComponent(pl.dataset.id));
         au.preload = 'auto';
+        au.playbackRate = rate;
         au.addEventListener('timeupdate', paint);
         au.addEventListener('loadedmetadata', () => {
           tm.textContent = fmtClock(au.duration);
@@ -6153,6 +6498,13 @@ function bindRecords(){
       au.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * au.duration;
       paint();
     };
+    if(spd) spd.onclick = e => {
+      e.stopPropagation();
+      rate = rate === 1 ? 1.5 : (rate === 1.5 ? 2 : 1);
+      pl.dataset.rate = String(rate);
+      if(au){ try{ au.playbackRate = rate; }catch(_){} }
+      paintRate();
+    };
   });
   $$('#recList .rec-del').forEach(btn=>{
     if(btn.dataset.bound) return; btn.dataset.bound='1';
@@ -6167,11 +6519,13 @@ function bindRecords(){
             body:JSON.stringify({id:btn.dataset.id})});
           state.records = (state.records||[]).filter(x=>x.id!==btn.dataset.id);
           item.remove();
-          toast('已移入回收站');
-        }catch(err){ toast('删除失败：' + (err.message||'')); }
+          toast('已移入回收站', {type:'ok'});
+        }catch(err){ toast('删除失败：' + (err.message||''), {type:'err'}); }
       });
     };
   });
+  /* 搜索词还在：重画/追加后把过滤重新套一遍 */
+  if(window.UX && UX.q.trim()) uxFilterRecordRows();
 }
 
 /* ============ 录音回收站 ============ */
@@ -6406,7 +6760,10 @@ function drawCrumb(){
   const parts=[`<a href="#" data-i="-1">全部文件</a>`]
     .concat(t.map((f,i)=>`<a href="#" data-i="${i}"${i===t.length-1?' class="cur"':''}>${esc(f.name)}</a>`));
   const v = state.driveView === 'grid' ? 'grid' : 'list';
+  const srt = (window.DRIVE_SORTS ? DRIVE_SORTS[state.driveSortIdx || 0] : null) || {label:'名称 A→Z'};
   $('#crumb').innerHTML = parts.join('<span class="cs">›</span>') +
+    `<button id="driveSort" class="sortb" title="排序：${esc(srt.label)}">
+       ${ICO('i-sort')}<span>${esc(srt.label)}</span></button>` +
     `<span class="vsw" id="driveVsw">
        <button data-v="list" class="${v==='list'?'on':''}" title="列表视图">
          <svg class="i"><use href="#i-list"/></svg></button>
@@ -6426,15 +6783,53 @@ function drawCrumb(){
     drawCrumb();
     redrawDriveList();
   });
+  const sb = $('#driveSort');
+  if(sb) sb.onclick = () => {
+    state.driveSortIdx = ((state.driveSortIdx || 0) + 1) % DRIVE_SORTS.length;
+    try{ localStorage.setItem('driveSortIdx', String(state.driveSortIdx)); }catch(_){}
+    drawCrumb();
+    redrawDriveList();
+  };
 }
 
 /* 切换视图时重画已加载的条目（不用重新请求） */
+const DRIVE_SORTS = [
+  {key:'name', dir:1,  label:'名称 A→Z'},
+  {key:'name', dir:-1, label:'名称 Z→A'},
+  {key:'time', dir:-1, label:'时间 新→旧'},
+  {key:'time', dir:1,  label:'时间 旧→新'},
+  {key:'size', dir:-1, label:'大小 大→小'},
+  {key:'size', dir:1,  label:'大小 小→大'},
+];
+function uxSortDrive(list){
+  const s = DRIVE_SORTS[state.driveSortIdx || 0] || DRIVE_SORTS[0];
+  const val = x => s.key === 'size' ? (Number(x.size) || 0)
+                  : s.key === 'time' ? (Number(x.date) || 0)
+                  : String(x.name || '');
+  const arr = (list || []).slice();
+  arr.sort((a, b) => {
+    if(!!a.isFolder !== !!b.isFolder) return a.isFolder ? -1 : 1;  // 文件夹永远在前
+    const va = val(a), vb = val(b);
+    if(va < vb) return -s.dir;
+    if(va > vb) return s.dir;
+    return String(a.name||'').localeCompare(String(b.name||''), 'zh-Hans-CN');
+  });
+  return arr;
+}
+
 function redrawDriveList(){
   const box = $('#driveList');
   if(!box) return;
   box.className = state.driveView === 'grid' ? 'grid' : '';
   if(!state.driveItems.length){ box.innerHTML = ''; return; }
-  box.innerHTML = state.driveItems.map(driveEntryHTML).join('');
+  const items = uxSortDrive(uxDriveItems());
+  if(!items.length){
+    const q = (window.UX && UX.q || '').trim();
+    box.innerHTML = `<div class="empty" style="padding:40px"><div class="big2">${ICO('i-search','xl')}</div>没有匹配「${esc(q)}」的文件</div>`;
+    setSentinel('', false);
+    return;
+  }
+  box.innerHTML = items.map(driveEntryHTML).join('');
   bindDrive();
   setSentinel(state.driveEnded ? '已经到底了' : '', false);
 }
@@ -7192,6 +7587,9 @@ function openViewer(it, opts){
   $('#vName').textContent = it.name || '';
   showMeta(it);
   $('#viewer').style.display='flex';
+  const vEl = $('#viewer');
+  vEl.classList.add('opening');
+  setTimeout(() => vEl.classList.remove('opening'), 320);
   $('#viewerLoading').style.display='none';
   const vchip = $('#vChip');   // 不再弹「加载中」小条：缩略图垫底就够了
   $('#vCopy').style.display='';
@@ -7741,14 +8139,21 @@ function extOf(name){
 }
 
 /* 把一个 File 用 PUT 直传到本地服务，服务端边收边写盘 */
-function sendFile(file, kind, target){
+const activeXhr = new Set();                 // 正在传的 XHR，点「停止」时一起 abort
+
+function sendFile(file, kind, target, silent, onProg){
   return new Promise((resolve, reject)=>{
     const xhr = new XMLHttpRequest();
+    activeXhr.add(xhr);
+    xhr.onloadend = () => activeXhr.delete(xhr);
     const q = `kind=${encodeURIComponent(kind)}&target=${encodeURIComponent(target)}`
             + `&name=${encodeURIComponent(file.name)}`;
     xhr.open('PUT', '/api/upload_raw?' + q);
     xhr.upload.onprogress = e => {
-      if(e.lengthComputable) uploadBarTransfer(e.loaded, e.total, file.name);
+      if(e.lengthComputable){
+        if(onProg) onProg(e.loaded, e.total);
+        else if(!silent) uploadBarTransfer(e.loaded, e.total, file.name);
+      }
     };
     xhr.onload = () => {
       let j = {};
@@ -7757,6 +8162,7 @@ function sendFile(file, kind, target){
       else reject(new Error(j.msg || j.error || ('HTTP '+xhr.status)));
     };
     xhr.onerror = () => reject(new Error('传输中断'));
+    xhr.onabort = () => reject(new Error('cancelled'));
     xhr.send(file);
   });
 }
@@ -7795,25 +8201,78 @@ async function uploadFiles(fileList, override){
   const bar = $('#dlbar');
   bar.style.display = 'block';
   const dest = (t.kind === 'drive' && t.name) ? ` → ${esc(t.name)}` : '';
-  bar.innerHTML = `<b>正在上传 ${files.length} 个文件${dest}</b>
-    <div style="color:var(--dim2);margin-top:4px">${esc(files[0].name)}</div>
-    <div class="pb"><i style="width:0"></i></div>
-    <div style="color:var(--dim2);font-size:11.5px" id="upPct">0%</div>`;
-
+  const total = files.length;
+  let finished = 0, failed = 0, cancelled = false;
+  let doneBytes = 0;
+  const totalBytes = files.reduce((n, f) => n + (f.size || 0), 0);
   const jobs = [];
-  for(let i=0;i<files.length;i++){
-    try{
-      const j = await sendFile(files[i], t.kind, t.target);
-      jobs.push(j.job);
-      if(i+1 < files.length){
-        const p = bar.querySelector('.pb i'); if(p) p.style.width = '0%';
-        const lbl = bar.querySelector('div[style*="dim2"]');
-        if(lbl) lbl.textContent = files[i+1].name;
+  const queue = files.slice();
+
+  const paint = cur => {
+    const p = bar.querySelector('.pb i');
+    if(p) p.style.width = Math.round(totalBytes ? doneBytes / totalBytes * 100
+                                                : finished / total * 100) + '%';
+    const lbl = bar.querySelector('#upName');
+    if(lbl) lbl.textContent = cancelled
+      ? `正在停止 · 未开始 ${queue.length} 个`
+      : `正在传第 ${Math.min(finished + 1, total)} / ${total} 个${cur ? ' · ' + cur : ''}`;
+    const pct = bar.querySelector('#upPct');
+    if(pct) pct.textContent = `${finished} / ${total} 完成${failed ? ` · ${failed} 个失败` : ''}`;
+  };
+
+  bar.innerHTML = `<b>正在上传 ${total} 个文件${dest}</b>
+    <div id="upName" style="color:var(--dim2);margin-top:4px"></div>
+    <div class="pb"><i style="width:0"></i></div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:2px">
+      <div style="color:var(--dim2);font-size:11.5px" id="upPct">0 / ${total} 完成</div>
+      <span style="flex:1"></span>
+      <button class="btn xs ghost" id="upCancel">停止</button>
+    </div>`;
+  const cancelBtn = bar.querySelector('#upCancel');
+  if(cancelBtn) cancelBtn.onclick = () => {
+    cancelled = true;
+    cancelBtn.disabled = true; cancelBtn.textContent = '正在停止 …';
+    activeXhr.forEach(x => { try{ x.abort(); }catch(_){} });  // 正在传的立即断
+    paint();
+  };
+
+  async function worker(){
+    while(!cancelled){
+      const f = queue.shift();
+      if(!f) return;
+      let err = null;
+      for(let attempt = 0; attempt < 2; attempt++){
+        const base = doneBytes;                 // 重试时从这里重新累计，进度不会虚高
+        try{
+          paint(f.name);
+          const j = await sendFile(f, t.kind, t.target, true,
+            n => { doneBytes = base + n; paint(f.name); });
+          doneBytes = base + (f.size || 0);
+          if(j && j.job) jobs.push(j.job);
+          err = null;
+          break;
+        }catch(e){
+          doneBytes = base;
+          if(String((e && e.message) || '') === 'cancelled'){ err = null; break; }
+          err = e;
+          if(attempt === 0) await new Promise(r => setTimeout(r, 500));
+        }
       }
-    }catch(e){
-      toast('上传失败：' + (e.message||'未知错误'));
+      if(err){
+        failed++;
+        toast('上传失败：' + (err.message || '未知错误'), {type:'err'});
+      }
+      finished++;
+      paint();
     }
   }
+  /* 2 路并发：比原来一个个排队快一倍，又不会把本地服务和网络打满 */
+  await Promise.all([worker(), worker()]);
+  if(cancelled && queue.length){
+    toast(`已停止：还有 ${queue.length} 个文件未开始`, {type:'busy'});
+  }
+  paint();
+  if(!queue.length && !cancelled) setTimeout(() => { bar.style.display = 'none'; }, 9000);
   if(jobs.length) watchUploads(jobs);
   if(t.kind === 'gallery' && jobs.length) setTimeout(()=>{ if(TAB==='gallery') loadAlbum(state.album, {fresh:true}); }, 2500);
   // 只有传到「当前这一层」才需要刷新列表；传进子文件夹时当前列表没变化
@@ -8073,6 +8532,7 @@ async function openSettings(){
   const auto = !!(s.auto != null ? s.auto : d.auto);
   const cur = Math.round((s.limit_setting || d.limit_setting || 3 * 1073741824) / 1073741824);
   const presets = [1, 2, 3, 5, 10];
+  const zoom = (()=>{ try{ const z = Number(localStorage.getItem('uiZoom')); return (z >= 0.85 && z <= 1.2) ? z : 1; }catch(_){ return 1; } })();
   if(!presets.includes(cur)) presets.push(cur);
   presets.sort((a,b)=>a-b);
   const opts = `<option value="auto"${auto ? ' selected' : ''}>自动（磁盘剩余的一半）</option>`
@@ -8094,6 +8554,14 @@ async function openSettings(){
       <input id="_stDir" value="${esc(s.custom_dir || '')}" placeholder="${esc(s.default_dir || '')}">
       <button class="btn outline sm" id="_stPick">更改</button></div>
     <p class="snote">留空 = 默认目录（exe 旁边的 cache）。改目录会把现有缓存（含 appkeys）复制过去，重启程序后生效；确认新目录正常后旧目录可以手动删。</p>
+    <div class="csec">界面</div>
+    <div class="srow"><span class="cn">界面缩放</span>
+      <select id="_stZoom">
+        <option value="0.94"${zoom===0.94?' selected':''}>紧凑 94%</option>
+        <option value="1"${zoom===1?' selected':''}>标准 100%</option>
+        <option value="1.08"${zoom===1.08?' selected':''}>宽松 108%</option>
+      </select></div>
+    <p class="snote">只影响这台机器上的显示大小，不改任何数据；小屏或觉得字小时可以调。</p>
     <div class="csec">账号</div>
     <div class="acct">
       <span class="ava">${a.avatar ? `<img src="${esc(a.avatar)}" alt="">`
@@ -8139,6 +8607,12 @@ async function openSettings(){
     const body = {cache_auto: sel === 'auto',
                   cache_dir: box.querySelector('#_stDir').value.trim()};
     if(sel !== 'auto') body.cache_limit = Number(sel) * 1073741824;
+    const zsel = box.querySelector('#_stZoom');
+    if(zsel){
+      const z = Number(zsel.value);
+      try{ localStorage.setItem('uiZoom', String(z)); }catch(_){}
+      document.body.style.zoom = String(z);
+    }
     try{
       const r = await post('/api/settings', body);
       if(!r.ok){ toast('保存失败：' + (r.error || '')); return; }
@@ -8282,6 +8756,547 @@ async function boot(){
   if(s.login){ renderTab(); refreshCacheSize(); refreshAccount(); } else showLogin();
 }
 boot();
+/* ============================================================
+   体验增强层：搜索 / 快捷键 / 滚动记忆 / 网络 / 命令面板
+   全部新增，不改原来的渲染入口；只在各页过滤函数里加一层判断。
+   ============================================================ */
+const UX = {
+  q: '',
+  pageScroll: {},
+  searchTimer: null,
+  recFilter: '',
+  todoSel: new Set(),
+};
+
+/* ---------- 搜索 ---------- */
+const SEARCH_PH = {
+  gallery: '搜索相簿名称',
+  note: '搜索笔记标题或摘要',
+  todo: '搜索代办内容',
+  record: '搜索录音（已加载部分）',
+  drive: '搜索当前文件夹'
+};
+function uxNorm(s){ return String(s == null ? '' : s).toLowerCase(); }
+
+function uxSearchHint(){
+  const has = !!UX.q.trim();
+  const wrap = $('#searchWrap');
+  if(wrap) wrap.classList.toggle('has', has);
+  $('#searchInp').value = UX.q;
+}
+
+function uxSetQ(v, immediate){
+  UX.q = String(v || '');
+  uxSearchHint();
+  clearTimeout(UX.searchTimer);
+  UX.searchTimer = setTimeout(uxApplySearch, immediate ? 0 : 220);
+}
+
+function uxApplySearch(){
+  if(!$('#searchInp')) return;
+  const q = UX.q.trim();
+  try{
+    if(TAB === 'gallery'){ drawAlbums(); }
+    else if(TAB === 'note'){ drawNoteList(); }
+    else if(TAB === 'todo'){ drawTodoFilters(); drawTodoList(true); }
+    else if(TAB === 'record'){ uxFilterRecordRows(); }
+    else if(TAB === 'drive'){ redrawDriveList(); }
+  }catch(e){ /* 页面正在重建时不打断 */ }
+  if(q){
+    const n = UX.visibleCount();
+    if(n === 0) toast('没有匹配「' + q + '」的内容', {quiet:false});
+  }
+}
+
+function UX_visibleCount(){
+  if(TAB === 'gallery') return $$('#left .alb').filter(x => x.style.display !== 'none').length;
+  if(TAB === 'note') return $$('#noteList .note').filter(x => x.style.display !== 'none').length;
+  if(TAB === 'todo') return $$('#todoBody .todo').length;
+  if(TAB === 'record') return $$('#recList .item').filter(x => x.style.display !== 'none').length;
+  if(TAB === 'drive') return $$('#driveList .dentry').filter(x => x.style.display !== 'none').length;
+  return 0;
+}
+UX.visibleCount = UX_visibleCount;
+
+/* 录音：按已加载的数据做前端过滤（不改请求） */
+function uxFilterRecordRows(){
+  const q = uxNorm(UX.q.trim());
+  $$('#recList .item').forEach(el => {
+    if(!q){ el.style.display = ''; return; }
+    const r = (state.records || []).find(x => String(x.id) === String(el.dataset.id));
+    const hay = uxNorm((r && (r.label || r.name)) || el.textContent);
+    el.style.display = hay.indexOf(q) >= 0 ? '' : 'none';
+  });
+  $$('#recList .recday').forEach(h => {
+    const next = h.nextElementSibling;
+    let any = false, n = next;
+    while(n && !n.classList.contains('recday')){
+      if(n.classList.contains('item') && n.style.display !== 'none'){ any = true; break; }
+      n = n.nextElementSibling;
+    }
+    h.style.display = any ? '' : 'none';
+  });
+}
+
+/* 云盘：当前层过滤（数据仍在 state.driveItems 里，不丢） */
+function uxDriveItems(){
+  const q = uxNorm(UX.q.trim());
+  const list = state.driveItems || [];
+  if(!q) return list;
+  return list.filter(x => uxNorm(x.name).indexOf(q) >= 0);
+}
+
+/* ---------- 跨页滚动位置 ---------- */
+function uxScrollKey(){
+  if(TAB === 'gallery') return null;          // 相册有自己的 gal.scroll 记忆
+  if(TAB === 'drive') return 'drive:' + (state.parent || 0);
+  return TAB;
+}
+function uxScrollEl(){
+  if(TAB === 'note') return $('#noteList');
+  return $('#content');
+}
+function uxSaveScroll(){
+  const k = uxScrollKey(); if(!k) return;
+  const el = uxScrollEl();
+  if(el && el.scrollTop > 0) UX.pageScroll[k] = el.scrollTop;
+}
+function uxRestoreScroll(){
+  const k = uxScrollKey(); if(!k) return;
+  const v = UX.pageScroll[k];
+  if(!v) return;
+  const tries = [0, 90, 240, 520, 900];
+  tries.forEach(t => setTimeout(() => {
+    if(uxScrollKey() !== k) return;
+    const el = uxScrollEl();
+    if(!el) return;
+    if(Math.abs(el.scrollTop - v) < 2) return;
+    if(el.scrollHeight - el.clientHeight >= v - 4) el.scrollTop = v;
+  }, t));
+}
+
+/* ---------- 切页签：统一收口 ---------- */
+const _uxRenderTabBase = renderTab;
+renderTab = async function(){
+  const prevTab = UX.lastTab;
+  const r = await _uxRenderTabBase.apply(this, arguments);
+  try{
+    const inp = $('#searchInp');
+    if(inp){
+      inp.placeholder = SEARCH_PH[TAB] || '搜索';
+      inp.disabled = !SEARCH_PH[TAB];
+    }
+  }catch(e){}
+  UX.lastTab = TAB;
+  if(prevTab && prevTab !== TAB){ UX.q = ''; uxSearchHint(); }
+  uxRestoreScroll();
+  return r;
+};
+
+/* ---------- 快捷键 ---------- */
+function uxTyping(){
+  const a = document.activeElement;
+  if(!a) return false;
+  if(a.id === 'searchInp' || a.id === 'cmdkInp') return true;
+  if(a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT') return true;
+  if(a.isContentEditable) return true;
+  return false;
+}
+function uxGotoTab(i){
+  const navs = $$('#side .nav');
+  if(navs[i]) navs[i].click();
+}
+function uxFocusSearch(){
+  const inp = $('#searchInp');
+  if(!inp || inp.disabled) return;
+  inp.focus(); inp.select();
+}
+function uxSelectAllCurrent(){
+  if(TAB === 'gallery' && state.canSel){
+    const btn = $('#btnSelAllBar');
+    if(btn && $('#selbar').classList.contains('on')) btn.click();
+    else $('#btnSelAll').click();
+    return;
+  }
+  if(TAB === 'note'){
+    const b = $('#noteSelAll'); if(b) b.click(); return;
+  }
+  if(TAB === 'record' || TAB === 'drive'){
+    $$('#content .tick2, #content .dtick').forEach(t => {
+      if(t.classList.contains('on')) return;
+      t.click();
+    });
+    return;
+  }
+  if(TAB === 'todo'){ uxTodoSelectAll(); return; }
+}
+function uxDeleteSel(){
+  if(TAB === 'gallery' && sel.size){
+    askConfirm(`把选中的 ${sel.size} 项移进回收站？可以在回收站里恢复。`, '删除', async () => {
+      try{
+        await api('/api/photo_delete', {method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({ids:[...sel]})});
+        toast('已移入回收站', {type:'ok'}); sel.clear(); updSel();
+        await loadAlbum(state.album, {fresh:true});
+      }catch(e){ toast('删除失败：' + errMsg(e), {type:'err'}); }
+    });
+    return;
+  }
+  if(TAB === 'note' && state.noteSel && state.noteSel.size){ deleteNotes([...state.noteSel]); return; }
+  if(TAB === 'record' && sel.size){ uxDeleteRecords(); return; }
+  if(TAB === 'drive' && sel.size){
+    if(sel.size) delDrive([...sel]);
+    return;
+  }
+  if(TAB === 'todo' && UX.todoSel && UX.todoSel.size){ uxTodoDeleteSelected(); return; }
+}
+
+document.addEventListener('keydown', e => {
+  const typing = uxTyping();
+  const mod = e.ctrlKey || e.metaKey;
+
+  /* 搜索框里的 Esc：先清空，再退出焦点 */
+  if(e.key === 'Escape' && document.activeElement && document.activeElement.id === 'searchInp'){
+    e.preventDefault();
+    if(UX.q){ uxSetQ('', true); }
+    else document.activeElement.blur();
+    return;
+  }
+
+  if(mod && !e.shiftKey && !e.altKey){
+    const k = e.key.toLowerCase();
+    if(k >= '1' && k <= '5'){ e.preventDefault(); uxGotoTab(Number(k) - 1); return; }
+    if(k === 'f'){ e.preventDefault(); uxFocusSearch(); return; }
+    if(k === 'k'){ e.preventDefault(); uxOpenCmdk(); return; }
+    if(k === 'r'){ if(!typing){ e.preventDefault(); refreshTab(); } return; }
+    if(k === 'a'){ if(!typing){ e.preventDefault(); uxSelectAllCurrent(); } return; }
+  }
+  if(e.key === 'F5'){ e.preventDefault(); refreshTab(); return; }
+  if(e.key === 'Delete' && !typing && !$('#cmdk').classList.contains('on')){ uxDeleteSel(); return; }
+});
+
+/* ---------- 网络状态 ---------- */
+function uxNetSync(){
+  const off = (navigator.onLine === false);
+  const bar = $('#netBar');
+  if(!bar) return;
+  bar.classList.toggle('on', off);
+  const txt = $('#netBarText');
+  if(txt) txt.textContent = off ? '网络已断开 · 正在使用本地缓存' : '网络已恢复 · 正在同步最新数据';
+}
+window.addEventListener('online', () => {
+  uxNetSync();
+  toast('网络已恢复', {type:'ok'});
+  setTimeout(() => { try{ refreshTab(); }catch(e){} }, 700);
+});
+window.addEventListener('offline', () => { uxNetSync(); });
+uxNetSync();
+
+/* 搜索框事件 */
+(function bindSearch(){
+  const inp = $('#searchInp');
+  if(!inp) return;
+  inp.addEventListener('input', () => uxSetQ(inp.value));
+  inp.addEventListener('keydown', e => {
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      uxApplySearch();
+      if(TAB === 'note'){
+        const first = $$('#noteList .note').find(x => x.style.display !== 'none');
+        if(first) first.click();
+      }
+    }
+  });
+  const clr = $('#searchClr');
+  if(clr) clr.onclick = () => { uxSetQ('', true); inp.focus(); };
+  inp.placeholder = SEARCH_PH[TAB] || '搜索';
+})();
+
+/* ---------- 命令面板 ---------- */
+let cmdkIdx = 0, cmdkItems = [];
+function uxCmdkData(){
+  return [
+    {icon:'i-todo', text:'代办', hint:'Ctrl+1', run:()=>uxGotoTab(0)},
+    {icon:'i-note', text:'笔记', hint:'Ctrl+2', run:()=>uxGotoTab(1)},
+    {icon:'i-photo', text:'相册', hint:'Ctrl+3', run:()=>uxGotoTab(2)},
+    {icon:'i-folder', text:'云盘', hint:'Ctrl+4', run:()=>uxGotoTab(3)},
+    {icon:'i-mic', text:'录音', hint:'Ctrl+5', run:()=>uxGotoTab(4)},
+    {icon:'i-refresh', text:'刷新当前页面', hint:'F5', run:()=>refreshTab()},
+    {icon:'i-plus', text:'新建（当前页）', hint:'', run:()=>{ const b=$('#btnNew'); if(b && b.style.display!=='none') b.click(); }},
+    {icon:'i-check', text:'全选当前页面', hint:'Ctrl+A', run:()=>uxSelectAllCurrent()},
+    {icon:'i-settings', text:'设置与缓存', hint:'', run:()=>{ const b=$('#btnSettingsSide'); if(b) b.click(); else openSettings(); }},
+    {icon:'i-search', text:'搜索当前页面', hint:'Ctrl+F', run:()=>uxFocusSearch()},
+  ];
+}
+function uxPaintCmdk(){
+  const box = $('#cmdkList');
+  if(!box) return;
+  const list = cmdkItems;
+  if(!list.length){ box.innerHTML = '<div class="cempty">没有匹配的命令</div>'; return; }
+  box.innerHTML = list.map((it, i) =>
+    `<div class="ci${i===cmdkIdx?' act':''}" data-i="${i}">
+      ${ICO(it.icon)}<span>${esc(it.text)}</span>${it.hint?`<span class="k">${esc(it.hint)}</span>`:''}
+    </div>`).join('');
+  $$('#cmdkList .ci').forEach(el => {
+    el.onclick = () => { const it = cmdkItems[Number(el.dataset.i)]; uxCloseCmdk(); if(it) it.run(); };
+  });
+  const act = box.querySelector('.ci.act');
+  if(act) act.scrollIntoView({block:'nearest'});
+}
+function uxOpenCmdk(){
+  const m = $('#cmdk');
+  if(!m) return;
+  m.classList.add('on');
+  const inp = $('#cmdkInp');
+  cmdkItems = uxCmdkData();
+  cmdkIdx = 0;
+  if(inp){ inp.value = ''; setTimeout(()=>inp.focus(), 30); }
+  uxPaintCmdk();
+}
+function uxCloseCmdk(){ $('#cmdk').classList.remove('on'); }
+function uxCmdkFilter(){
+  const q = uxNorm($('#cmdkInp').value.trim());
+  cmdkItems = uxCmdkData().filter(x => !q || uxNorm(x.text).indexOf(q) >= 0);
+  cmdkIdx = 0;
+  uxPaintCmdk();
+}
+(function bindCmdk(){
+  const m = $('#cmdk');
+  if(!m) return;
+  m.addEventListener('click', e => { if(e.target === m) uxCloseCmdk(); });
+  const inp = $('#cmdkInp');
+  inp.addEventListener('input', uxCmdkFilter);
+  inp.addEventListener('keydown', e => {
+    if(e.key === 'Escape'){ e.preventDefault(); uxCloseCmdk(); return; }
+    if(e.key === 'ArrowDown'){ e.preventDefault(); cmdkIdx = Math.min(cmdkItems.length-1, cmdkIdx+1); uxPaintCmdk(); return; }
+    if(e.key === 'ArrowUp'){ e.preventDefault(); cmdkIdx = Math.max(0, cmdkIdx-1); uxPaintCmdk(); return; }
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      const it = cmdkItems[cmdkIdx];
+      uxCloseCmdk();
+      if(it) it.run();
+    }
+  });
+})();
+
+/* ---------- 待办：快速添加 / 批量操作 ---------- */
+function uxTodoHay(t){
+  if(!t) return '';
+  let s = String(t.title || '');
+  (t.subs || []).forEach(x => { s += ' ' + String((x && x.text) || x || ''); });
+  return s;
+}
+function uxTodoSelN(){ return (UX.todoSel && UX.todoSel.size) || 0; }
+function uxTodoToolsHTML(){
+  const n = uxTodoSelN();
+  return `<div id="todoTools">
+    <div id="todoQuick">
+      <svg class="i"><use href="#i-plus"/></svg>
+      <input id="todoQuickInp" placeholder="添加代办，回车即建" autocomplete="off" spellcheck="false">
+      <button id="todoQuickBtn" class="btn primary xs">添加</button>
+    </div>
+    <div id="todoBatch" class="${n ? 'on' : ''}">
+      <span id="todoBatchCnt">已选 ${n} 项</span>
+      <button id="todoBatchDone" class="btn outline xs">标记完成</button>
+      <button id="todoBatchDel" class="btn danger xs">删除</button>
+      <button id="todoBatchClear" class="btn ghost xs">取消</button>
+    </div>
+  </div>`;
+}
+function uxPaintTodoSel(){
+  const n = uxTodoSelN();
+  const bar = $('#todoBatch');
+  if(bar) bar.classList.toggle('on', n > 0);
+  const cnt = $('#todoBatchCnt');
+  if(cnt) cnt.textContent = `已选 ${n} 项`;
+  $$('#todoBody .tck').forEach(t => {
+    const on = UX.todoSel.has(t.dataset.id);
+    t.classList.toggle('on', on);
+    t.setAttribute('aria-checked', on ? 'true' : 'false');
+    const row = t.closest('.todo'); if(row) row.classList.toggle('sel', on);
+  });
+}
+function uxBindTodoTools(){
+  const inp = $('#todoQuickInp');
+  const add = async () => {
+    const v = String(inp.value || '').trim();
+    if(!v){ inp.focus(); return; }
+    const btn = $('#todoQuickBtn');
+    if(btn){ btn.disabled = true; btn.textContent = '…'; }
+    try{
+      await api('/api/todo_create', {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({title:v})});
+      inp.value = '';
+      toast('已添加代办', {type:'ok'});
+      await refreshTodoState(true);
+      drawTodoFilters(); drawTodoList(true);
+      setTimeout(()=>{ const i2 = $('#todoQuickInp'); if(i2) i2.focus(); }, 40);
+    }catch(e){
+      toast('添加失败：' + errMsg(e), {type:'err'});
+    }finally{
+      if(btn){ btn.disabled = false; btn.textContent = '添加'; }
+    }
+  };
+  if(inp) inp.onkeydown = e => {
+    if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); add(); }
+    if(e.key === 'Escape'){ inp.value = ''; inp.blur(); }
+  };
+  const b = $('#todoQuickBtn'); if(b) b.onclick = add;
+  const d = $('#todoBatchDone'); if(d) d.onclick = uxTodoBatchDone;
+  const del = $('#todoBatchDel'); if(del) del.onclick = uxTodoDeleteSelected;
+  const clr = $('#todoBatchClear');
+  if(clr) clr.onclick = () => { UX.todoSel.clear(); uxPaintTodoSel(); };
+}
+function uxTodoSelectAll(){
+  const ids = $$('#todoBody .todo').map(x => x.dataset.id);
+  if(!ids.length) return;
+  const all = ids.every(id => UX.todoSel.has(id));
+  ids.forEach(id => all ? UX.todoSel.delete(id) : UX.todoSel.add(id));
+  uxPaintTodoSel();
+}
+async function uxTodoBatchDone(){
+  const ids = [...UX.todoSel];
+  if(!ids.length) return;
+  let ok = 0, fail = 0;
+  toast('正在处理 ' + ids.length + ' 项 …', {type:'busy', quiet:true});
+  for(const id of ids){
+    const t = (state.todos || []).find(x => String(x.id) === String(id));
+    if(!t) continue;
+    const done = !t.done;
+    try{
+      await api('/api/todo_toggle', {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id, done})});
+      t.done = done; t.finished = done ? Date.now() : 0; ok++;
+    }catch(e){ fail++; }
+  }
+  UX.todoSel.clear();
+  drawTodoFilters(); drawTodoList(true);
+  toast(`已更新 ${ok} 项${fail ? `，${fail} 项失败` : ''}`, {type: fail ? 'err' : 'ok'});
+}
+async function uxTodoDeleteSelected(){
+  const ids = [...UX.todoSel];
+  if(!ids.length) return;
+  askConfirm(`删除选中的 ${ids.length} 条代办？删掉不能恢复。`, '删除', async () => {
+    let ok = 0, fail = 0;
+    toast('正在删除 ' + ids.length + ' 项 …', {type:'busy', quiet:true});
+    for(const id of ids){
+      try{
+        await api('/api/todo_delete', {method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({id})});
+        ok++;
+      }catch(e){ fail++; }
+    }
+    UX.todoSel.clear();
+    const set = new Set(ids.map(String));
+    state.todos = (state.todos || []).filter(x => !set.has(String(x.id)));
+    drawTodoFilters(); drawTodoList(true);
+    toast(`已删除 ${ok} 条${fail ? `，${fail} 条失败` : ''}`, {type: fail ? 'err' : 'ok'});
+  });
+}
+
+/* 录音批量删除（Ctrl+Delete / 删除键） */
+async function uxDeleteRecords(){
+  const ids = [...sel];
+  if(!ids.length) return;
+  askConfirm(`删除选中的 ${ids.length} 条录音？会先进回收站，可以恢复。`, '删除', async () => {
+    let ok = 0, fail = 0;
+    for(const id of ids){
+      try{
+        await api('/api/record_delete', {method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({id})});
+        ok++;
+      }catch(e){ fail++; }
+    }
+    const set = new Set(ids.map(String));
+    state.records = (state.records || []).filter(x => !set.has(String(x.id)));
+    sel.clear(); updSel();
+    renderRecords(true);
+    toast(`已移入回收站 ${ok} 条${fail ? `，${fail} 条失败` : ''}`, {type: fail ? 'err' : 'ok'});
+  });
+}
+
+/* ---------- 笔记全屏的 Esc 退出（capture，先于其它关闭逻辑） ---------- */
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Escape') return;
+  const r = $('#noteReader');
+  if(!r || !r.classList.contains('writing')) return;
+  const b = $('#neFull');
+  if(b){ e.preventDefault(); e.stopPropagation(); b.click(); }
+}, true);
+
+/* ---------- 界面缩放：0.94 / 1 / 1.08，存本地 ---------- */
+(function initUiZoom(){
+  try{
+    const z = Number(localStorage.getItem('uiZoom'));
+    if(z >= 0.85 && z <= 1.2) document.body.style.zoom = String(z);
+  }catch(_){}
+})();
+
+/* ---------- 相册拖动框选 ---------- */
+(function bindMarquee(){
+  const c = $('#content'), box = $('#marquee');
+  if(!c || !box) return;
+  let active = false, moved = false, sx = 0, sy = 0, lastR = null;
+  const hit = (el, r) => {
+    const q = el.getBoundingClientRect();
+    return !(q.right < r.left || q.left > r.right || q.bottom < r.top || q.top > r.bottom);
+  };
+  const clearHits = () => $$('#content .card').forEach(x => x.classList.remove('srch-hit'));
+  c.addEventListener('pointerdown', e => {
+    if(TAB !== 'gallery' || e.button !== 0) return;
+    if(e.target.closest('.card,.tick,.tick2,.row,.item,.empty,button,a,#tl')) return;
+    if(sel.size) return;                 // 已经有选择时按常规点选，不拖框
+    active = true; moved = false;
+    sx = e.clientX; sy = e.clientY; lastR = null;
+  });
+  window.addEventListener('pointermove', e => {
+    if(!active) return;
+    const dx = Math.abs(e.clientX - sx), dy = Math.abs(e.clientY - sy);
+    if(!moved && dx + dy < 5) return;
+    moved = true;
+    lastR = {left: Math.min(sx, e.clientX), top: Math.min(sy, e.clientY),
+             right: Math.max(sx, e.clientX), bottom: Math.max(sy, e.clientY)};
+    box.style.display = 'block';
+    box.style.left = lastR.left + 'px';
+    box.style.top = lastR.top + 'px';
+    box.style.width = (lastR.right - lastR.left) + 'px';
+    box.style.height = (lastR.bottom - lastR.top) + 'px';
+    $$('#content .card[data-key]').forEach(el => el.classList.toggle('srch-hit', hit(el, lastR)));
+  }, {passive:true});
+  const finish = () => {
+    if(!active) return;
+    active = false;
+    box.style.display = 'none';
+    if(moved && lastR){
+      $$('#content .card[data-key]').forEach(el => {
+        if(hit(el, lastR)) sel.add(el.dataset.key);
+      });
+      if(sel.size){ applySelToCards(); updSel(); selSetAnchor([...sel][0]); }
+    }
+    clearHits();
+  };
+  window.addEventListener('pointerup', finish);
+  window.addEventListener('pointercancel', finish);
+})();
+
+/* ---------- 滚动渐隐 ---------- */
+(function bindScrollFade(){
+  const c = $('#content');
+  if(!c) return;
+  let t = null;
+  c.addEventListener('scroll', () => {
+    c.classList.add('scrollfade');
+    clearTimeout(t);
+    t = setTimeout(() => c.classList.remove('scrollfade'), 260);
+  }, {passive:true});
+})();
+
+/* ---------- 启动闪屏兜底 ---------- */
+setTimeout(() => {
+  const s = $('#splash');
+  if(s) s.classList.add('off');
+}, 1600);
+
 </script>
 </body>
 </html>

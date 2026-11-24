@@ -56,7 +56,8 @@ DEFAULT_CACHE_LIMIT = 3 * 1024 * 1024 * 1024
 
 
 def _load_settings():
-    out = {"cache_dir": "", "cache_limit": DEFAULT_CACHE_LIMIT, "cache_auto": False}
+    out = {"cache_dir": "", "cache_limit": DEFAULT_CACHE_LIMIT, "cache_auto": False,
+           "window": {}}
     try:
         with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
             j = json.load(f) or {}
@@ -5269,6 +5270,73 @@ def _style_native_titlebar(win):
         pass
 
 
+# ── 窗口几何：记住上次的位置 / 大小 / 最大化，下次按原样打开 ────────
+_WIN_STATE = {"max": bool((SETTINGS.get("window") or {}).get("max"))}
+
+
+def _screen_size():
+    try:
+        import ctypes
+        u = ctypes.windll.user32
+        return int(u.GetSystemMetrics(0)), int(u.GetSystemMetrics(1))
+    except Exception:
+        return 0, 0
+
+
+def _window_start_geom():
+    """返回 (width, height, x, y, maximized)。记录坏了就回落到默认值。"""
+    g = SETTINGS.get("window") or {}
+    try:
+        w = int(g.get("w") or 0)
+        h = int(g.get("h") or 0)
+        x = g.get("x")
+        y = g.get("y")
+        x = int(x) if x is not None else None
+        y = int(y) if y is not None else None
+        mx = bool(g.get("max"))
+    except Exception:
+        w = h = 0
+        x = y = None
+        mx = False
+    if w <= 0 or h <= 0:
+        w, h = 1280, 820
+    w = max(980, w)
+    h = max(640, h)
+    sw, sh = _screen_size()
+    if sw and sh:
+        w = min(w, sw)
+        h = min(h, sh)
+        # 至少要有 200px 落在屏幕里，否则当作换了显示器，居中打开
+        if x is not None and y is not None:
+            if x + 200 < 0 or y + 200 < 0 or x > sw - 200 or y > sh - 200:
+                x = y = None
+    return w, h, x, y, mx
+
+
+def _save_window_geom(win):
+    try:
+        g = {
+            "x": int(win.x), "y": int(win.y),
+            "w": int(win.width), "h": int(win.height),
+            "max": bool(_WIN_STATE.get("max")),
+        }
+        old = SETTINGS.get("window") or {}
+        # 最大化拿到的是屏幕尺寸：保留上一次的普通尺寸，还原后还是原来的窗口大小
+        if g["max"] and old.get("w") and old.get("h"):
+            g["w"] = int(old["w"])
+            g["h"] = int(old["h"])
+            if old.get("x") is not None:
+                g["x"] = int(old["x"])
+            if old.get("y") is not None:
+                g["y"] = int(old["y"])
+        SETTINGS["window"] = g
+        _save_settings(SETTINGS)
+        print("[窗口] 已记住位置：%sx%s @ %s,%s%s" % (
+            g["w"], g["h"], g["x"], g["y"], "（最大化）" if g["max"] else ""))
+    except Exception as e:
+        print("[窗口] 保存位置失败：%s" % e)
+
+
 def main():
     global WV_CDP_PORT
     print("=" * 56)
@@ -5316,9 +5384,18 @@ def main():
     threading.Thread(target=_prewarm_timeline, daemon=True).start()
     threading.Thread(target=_prewarm_todos, daemon=True).start()
 
+    _gw, _gh, _gx, _gy, _gmax = _window_start_geom()
     win = webview.create_window("小米云", "http://127.0.0.1:%d/" % port,
-                                width=1280, height=820, min_size=(980, 640),
+                                width=_gw, height=_gh, x=_gx, y=_gy,
+                                maximized=_gmax,
+                                min_size=(980, 640),
                                 text_select=True)      # 允许选中/复制便签正文
+    try:
+        win.events.maximized += lambda *_: _WIN_STATE.__setitem__("max", True)
+        win.events.restored += lambda *_: _WIN_STATE.__setitem__("max", False)
+        win.events.closing += lambda *_: _save_window_geom(win)
+    except Exception as e:
+        print("[窗口] 几何事件绑定失败：%s" % e)
     win.events.loaded += lambda *_: _style_native_titlebar(win)
     # 窗口/任务栏图标：和 exe 图标、界面左上角 logo 用同一张 app.ico
     icon = os.path.join(res_dir(), "app.ico")
