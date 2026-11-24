@@ -1,0 +1,26 @@
+# 本地数据 / 密钥：绝对不要提交
+cache/
+session.dat
+session.dat.bak_*
+settings.json
+album_layout.json
+todos.dat
+login_qr.png
+
+# 构建产物与日志
+build/
+dist/
+dist_*/
+*.exe
+*.zip
+*.log
+*.bak_*
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# 编辑器
+.claude/
+.vscode/
+.idea/
