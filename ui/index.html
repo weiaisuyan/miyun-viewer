@@ -2376,6 +2376,19 @@ header #btnNew{min-width:0}
   box-shadow:0 0 0 3px var(--accent-weak)}
 #searchWrap svg.i{width:13px;height:13px;color:var(--fg-4);flex:none}
 #searchWrap:focus-within svg.i{color:var(--accent)}
+/* 放大镜改成真按钮：点一下等于按回车，不再只是装饰图标 */
+#searchGo{display:flex;align-items:center;justify-content:center;flex:none;width:18px;height:18px;
+  padding:0;border:0;border-radius:5px;background:none;cursor:pointer}
+#searchGo:hover{background:var(--surface-4)}
+#searchGo:hover svg.i{color:var(--accent)}
+#searchGo:active{transform:scale(.94)}
+#searchGo[disabled]{opacity:.35;cursor:default}
+/* 相册左栏：搜索无命中时的说明块（区别于「这本相簿是空的」） */
+.albmiss{display:flex;flex-direction:column;align-items:center;gap:7px;
+  padding:30px 16px;text-align:center;color:var(--fg-4)}
+.albmiss svg.i{opacity:.55}
+.albmiss .m1{color:var(--fg-2);font-size:12.5px;word-break:break-all}
+.albmiss .m2{font-size:11.5px;line-height:1.65;color:var(--fg-4)}
 #searchInp{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--fg);
   font-family:inherit;font-size:12.5px;line-height:1}
 #searchInp::placeholder{color:var(--fg-4)}
@@ -2650,9 +2663,11 @@ header #btnNew{min-width:0}
     </div>
     <span class="spacer"></span>
     <div id="searchWrap">
-      <svg class="i"><use href="#i-search"/></svg>
+      <button id="searchGo" type="button" title="搜索（回车）" aria-label="搜索">
+        <svg class="i"><use href="#i-search"/></svg>
+      </button>
       <input id="searchInp" type="text" placeholder="搜索" autocomplete="off" spellcheck="false">
-      <button id="searchClr" title="清空搜索">×</button>
+      <button id="searchClr" type="button" title="清空搜索">×</button>
     </div>
     <div class="hacts">
       <button class="btn primary sm" id="btnNew" style="display:none">新建</button>
@@ -3120,7 +3135,7 @@ $$('.nav').forEach(n=>n.onclick=()=>{
   if(window.UX) uxSaveScroll();
   $$('.nav').forEach(x=>x.classList.toggle('on',x===n));
   TAB=n.dataset.tab;
-  if(window.UX){ UX.q = ''; uxSearchHint(); }
+  if(window.UX){ UX.q = ''; uxSearchHint(); uxSyncSearchInput(''); }
   moveNavPill();
   renderTab();
 });
@@ -3759,7 +3774,16 @@ function drawAlbums(){
   bar.classList.add('gal');
 
   let mid = '';
-  if(photosOpen){
+  if(q){
+    /* 搜索时强制展示命中项（折叠组也一起摊开）；一个都没命中就给一句明确说明——
+       相册页只按相簿名匹配，不匹配照片内容，这是数据源限制，不是功能坏了 */
+    const hits = g.normal.concat(g.folded);
+    mid = hits.length
+      ? hits.map(a => albumRowHTML(a, false)).join('')
+      : `<div class="albmiss">${ICO('i-search','lg')}
+         <div class="m1">相簿里没有「${esc(q)}」</div>
+         <div class="m2">这一页只搜相簿名称；照片文件名、机型、日期等要在「照片」网格里按内容找</div></div>`;
+  } else if(photosOpen){
     mid += g.normal.map(a=>albumRowHTML(a,false)).join('');
     if(g.folded.length){
       mid += `<div class="foldh${lay.foldOpen?' open':''}" id="foldHd">
@@ -8767,6 +8791,10 @@ const UX = {
   recFilter: '',
   todoSel: new Set(),
 };
+/* 关键：UX 必须挂到 window 上。各页过滤函数统一写的是
+   (window.UX && UX.q) —— 顶层 const 不会自动成为 window 的属性，
+   所以以前每个页面的搜索条件永远取到空字符串，过滤形同虚设。 */
+window.UX = UX;
 
 /* ---------- 搜索 ---------- */
 const SEARCH_PH = {
@@ -8778,11 +8806,21 @@ const SEARCH_PH = {
 };
 function uxNorm(s){ return String(s == null ? '' : s).toLowerCase(); }
 
+/* 只切换「有内容」状态，绝不回写 input.value：
+   在 input 事件里回写会把光标打回末尾，并打断中文输入法的拼写，
+   结果中文还没上屏就被清掉，表现出来就是「什么都搜不出来」。 */
 function uxSearchHint(){
   const has = !!UX.q.trim();
   const wrap = $('#searchWrap');
   if(wrap) wrap.classList.toggle('has', has);
-  $('#searchInp').value = UX.q;
+  const go = $('#searchGo');
+  if(go) go.disabled = !SEARCH_PH[TAB];
+}
+
+/* 只有程序自己改搜索词时才回写输入框（切页、Esc、清空按钮） */
+function uxSyncSearchInput(v){
+  const inp = $('#searchInp');
+  if(inp && inp.value !== v) inp.value = v;
 }
 
 function uxSetQ(v, immediate){
@@ -8888,7 +8926,7 @@ renderTab = async function(){
     }
   }catch(e){}
   UX.lastTab = TAB;
-  if(prevTab && prevTab !== TAB){ UX.q = ''; uxSearchHint(); }
+  if(prevTab && prevTab !== TAB){ UX.q = ''; uxSearchHint(); uxSyncSearchInput(''); }
   uxRestoreScroll();
   return r;
 };
@@ -8958,7 +8996,7 @@ document.addEventListener('keydown', e => {
   /* 搜索框里的 Esc：先清空，再退出焦点 */
   if(e.key === 'Escape' && document.activeElement && document.activeElement.id === 'searchInp'){
     e.preventDefault();
-    if(UX.q){ uxSetQ('', true); }
+    if(UX.q || document.activeElement.value){ document.activeElement.value = ''; uxSetQ('', true); }
     else document.activeElement.blur();
     return;
   }
@@ -8996,20 +9034,34 @@ uxNetSync();
 (function bindSearch(){
   const inp = $('#searchInp');
   if(!inp) return;
-  inp.addEventListener('input', () => uxSetQ(inp.value));
-  inp.addEventListener('keydown', e => {
-    if(e.key === 'Enter'){
-      e.preventDefault();
-      uxApplySearch();
-      if(TAB === 'note'){
-        const first = $$('#noteList .note').find(x => x.style.display !== 'none');
-        if(first) first.click();
-      }
+  let composing = false;          // 中文输入法拼字期间不触发搜索，避免半成品被拿去匹配
+
+  function runNow(){
+    clearTimeout(UX.searchTimer);
+    UX.q = inp.value;
+    uxSearchHint();
+    uxApplySearch();
+    if(TAB === 'note'){
+      const first = $$('#noteList .note').find(x => x.style.display !== 'none');
+      if(first) first.click();
     }
+  }
+
+  inp.addEventListener('compositionstart', () => { composing = true; });
+  inp.addEventListener('compositionend', () => { composing = false; uxSetQ(inp.value); });
+  inp.addEventListener('input', () => { if(!composing) uxSetQ(inp.value); });
+  inp.addEventListener('keydown', e => {
+    if(e.key === 'Enter' && !composing){ e.preventDefault(); runNow(); }
   });
+  /* 输入框原生的「搜索」事件（部分输入法回车会走这条） */
+  inp.addEventListener('search', () => { if(!composing) uxSetQ(inp.value); });
+
+  const go = $('#searchGo');
+  if(go) go.onclick = () => { runNow(); inp.focus(); };
   const clr = $('#searchClr');
-  if(clr) clr.onclick = () => { uxSetQ('', true); inp.focus(); };
+  if(clr) clr.onclick = () => { inp.value = ''; UX.q = ''; uxSearchHint(); uxSetQ('', true); inp.focus(); };
   inp.placeholder = SEARCH_PH[TAB] || '搜索';
+  if(go) go.disabled = !SEARCH_PH[TAB];
 })();
 
 /* ---------- 命令面板 ---------- */
