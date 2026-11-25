@@ -1915,19 +1915,21 @@ header #btnNew{min-width:0}
 .chip.on{background:linear-gradient(180deg,rgba(10,132,255,.34),rgba(10,132,255,.16));
   border-color:rgba(90,170,255,.45);color:#e6f1ff}
 .chip.on em{color:rgba(190,220,255,.82)}
-.note{margin:2px 10px;padding:11px 12px;border-radius:12px;
+.note{position:relative;margin:1px 0;padding:9px 9px 9px 22px;border-radius:10px;
   border-bottom:none;transition:background var(--dur-2) var(--ease-out),
     box-shadow var(--dur-2) var(--ease-out)}
 .note:hover{background:rgba(255,255,255,.055)}
 .note.on{background:linear-gradient(90deg,rgba(10,132,255,.17),rgba(10,132,255,.055));
   box-shadow:inset 0 0 0 1px rgba(10,132,255,.18)}
-.note.on::before{left:0;top:11px;bottom:11px;width:2px;background:#3da2ff}
+.note.on::before{left:0;top:10px;bottom:10px;width:2px;background:#3da2ff}
 .note.sel{background:rgba(10,132,255,.14)}
 .note .ti{font-size:14px;font-weight:600;letter-spacing:-.012em}
 .note .dt{font-size:10.5px;color:var(--fg-4);font-weight:400}
 .note .pv{font-size:12px;line-height:1.65;color:var(--fg-3);margin-top:5px}
-.note .ncb{width:20px;height:20px;border-radius:50%;border-color:rgba(255,255,255,.28)}
 .note.sel .ncb{background:#0a84ff;border-color:rgba(255,255,255,.9)}
+/* 置顶：和手机/官方客户端一致 —— 置顶笔记排在列表最前，标题前带一枚橙色图钉 */
+.note .pin{width:13px;height:13px;flex:none;color:#ffb340;align-self:center;margin:-1px 0 0 4px}
+#noteMeta .npin{color:#ffb340;font-weight:600}
 .note-load{padding:15px 16px;color:var(--fg-3);font-size:12px;border-bottom:none}
 #notePad{padding:44px 52px 52px;max-width:820px}
 #notePad .nrow{gap:16px;margin:0 0 24px;align-items:flex-start}
@@ -2203,6 +2205,10 @@ header #btnNew{min-width:0}
   background:linear-gradient(180deg,#2f9bff,#0a84ff);border-color:rgba(255,255,255,.10);color:#fff;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 4px 12px -6px rgba(10,132,255,.8)
 }
+/* 笔记列表的多选框单独小一号，并且不占正文缩进，左边不再空一大块 */
+.note .ncb{position:absolute;left:6px;top:11px;width:14px;height:14px;margin:0;
+  border-width:1px;border-color:rgba(255,255,255,.28)}
+.note .ncb svg{width:9px;height:9px;stroke-width:3}
 
 /* ---------- 14. 窄窗口：只改密度，不砍功能 ---------- */
 @media (max-width:1120px){
@@ -2558,6 +2564,9 @@ header #btnNew{min-width:0}
   <symbol id="i-note" viewBox="0 0 24 24">
     <path d="M6.2 3.7h7.9l4.4 4.4v11.4a1.7 1.7 0 01-1.7 1.7H6.2a1.7 1.7 0 01-1.7-1.7V5.4a1.7 1.7 0 011.7-1.7z"/>
     <path d="M14 3.8v4.4h4.4M8.4 12.6h6.4M8.4 16.2h4.3"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24">
+    <path d="M8.7 4.2h6.6l-.9 6 3.1 3.3H6.5l3.1-3.3-.9-6z"/>
+    <path d="M12 13.8v6.4"/></symbol>
   <symbol id="i-mic" viewBox="0 0 24 24">
     <rect x="9" y="2.9" width="6" height="11" rx="3"/>
     <path d="M5.6 11.3a6.4 6.4 0 0012.8 0M12 17.7v3.4"/></symbol>
@@ -5075,10 +5084,19 @@ function noteShellEmpty(){
 
 /* 本地新建/改名/删除后先把手上的列表对齐：不等整表刷新，界面立刻一致。
    select=true 时顺手把这条标成当前选中。 */
+/* 列表排序和手机端一致：置顶最前（最近置顶的在上），其余按修改时间倒序。
+   本地新建/改名后也走这套，别把置顶的那条排到后面去。 */
+function noteCmp(a, b){
+  return ((a.sticky ? 0 : 1) - (b.sticky ? 0 : 1))
+      || ((b.sticky || 0) - (a.sticky || 0))
+      || ((b.modified || 0) - (a.modified || 0));
+}
 function upsertNoteLocal(n, select){
   if(!n || n.id == null) return;
   const id = String(n.id);
   const list = state.notes = state.notes || [];
+  const i = list.findIndex(x => String(x.id) === id);
+  const old = i >= 0 ? list[i] : null;
   const item = {
     id,
     title: n.title || '（无标题）',
@@ -5086,12 +5104,12 @@ function upsertNoteLocal(n, select){
     modified: n.modified || Date.now(),
     created: n.created || n.modified || Date.now(),
     folder: String(n.folder != null ? n.folder : '0'),
-    enc: !!n.enc
+    enc: !!n.enc,
+    sticky: n.sticky != null ? n.sticky : ((old && old.sticky) || 0)
   };
-  const i = list.findIndex(x => String(x.id) === id);
-  if(i >= 0) list[i] = Object.assign({}, list[i], item);
-  else list.unshift(item);
-  list.sort((a, b) => (b.modified || 0) - (a.modified || 0));
+  if(i >= 0) list[i] = Object.assign({}, old, item);
+  else list.push(item);
+  list.sort(noteCmp);
   if(select) state.noteId = id;
   drawNoteList(false);        // 保留正在读的那条，不跳回第一条
 }
@@ -5234,17 +5252,19 @@ function drawNoteList(reselect){
     $('#noteReader').innerHTML = `<div class="empty"><div class="big2">${ICO('i-note','xl')}</div>换一个分类看看</div>`;
     return;
   }
-  box.innerHTML = `<div class="nhead">
-      <div class="notefilter" id="noteFilter"></div>
-    </div>` + list.map(n=>`
+  const row = n => `
     <div class="note${state.noteSel && state.noteSel.has(n.id)?' sel':''}" data-id="${esc(n.id)}">
       <span class="ncb" data-id="${esc(n.id)}">${ICO('i-check')}</span>
       <div class="nmain">
-        <div class="h"><span class="ti">${esc(n.title||'无标题')}</span>
+        <div class="h"><span class="ti">${esc(n.title||'无标题')}</span>${n.sticky?`<span class="pin" title="置顶">${ICO('i-pin')}</span>`:''}
           <span class="dt">${fmtShort(n.modified)}</span></div>
         <div class="pv">${esc(n.preview||'（空）')}</div>
       </div>
-    </div>`).join('');
+    </div>`;
+  /* 置顶笔记由后端排在最前（最近置顶的在上），标题前的图钉就是标识，不再单起「置顶」分组 */
+  box.innerHTML = `<div class="nhead">
+      <div class="notefilter" id="noteFilter"></div>
+    </div>` + list.map(row).join('');
   if(!state.noteSel) state.noteSel = new Set();
   drawNoteChips();
   const selBar = $('#noteSelBar');
@@ -5476,6 +5496,9 @@ function paintNote(n, options){
   if(!r || !r.isConnected) return;
   const keepScroll = o.quiet ? (($('#noteScroll') && $('#noteScroll').scrollTop) || 0) : 0;
   const bodyMd = noteDisplayBody(n);
+  /* 正文缓存里可能没有 sticky（旧缓存），从列表那条补一下，信息栏才不会丢「置顶」 */
+  const listNote = (state.notes || []).find(x => String(x.id) === String(n.id));
+  const sticky = n.sticky != null ? n.sticky : (listNote ? (listNote.sticky || 0) : 0);
   r.innerHTML = `<div id="noteScroll"><div id="notePad">
     <div class="nrow">
       <h2>${esc(n.title||'无标题')}</h2>
@@ -5486,7 +5509,7 @@ function paintNote(n, options){
     </div>
     <div class="body mdbody" id="noteBody">${bodyMd?renderMd(bodyMd):'（这条笔记没有正文）'}</div>
   </div></div>
-  <div id="noteMeta"><span>创建 ${fmtDate(n.created)}</span>
+  <div id="noteMeta">${sticky?'<span class="npin">置顶</span>':''}<span>创建 ${fmtDate(n.created)}</span>
     <span>修改 ${fmtDate(n.modified)}</span>
     ${n.enc?'<span style="color:var(--accent)">· 已本地解密</span>':''}</div>`;
   const sc = $('#noteScroll'); if(sc) sc.scrollTop = keepScroll;

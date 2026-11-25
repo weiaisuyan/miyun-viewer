@@ -2425,6 +2425,15 @@ def _dec_field(e, field):
 NOTES_CACHE = {"at": 0.0, "notes": [], "folders": []}
 NOTES_FETCH_LOCK = threading.Lock()     # 同时只允许一个完整拉取
 NOTES_REFRESH_AFTER = 300               # 缓存超过 5 分钟就在后台刷一次
+NOTES_CACHE_VER = 2                     # 2 = 带 stickyTime（置顶）字段；旧缓存直接作废重拉
+
+
+def _note_sort_key(n):
+    """列表顺序对齐手机 / 官方客户端：
+    置顶笔记永远在最前，组内按「置顶时间」新的在上；
+    其余按修改时间倒序（最近的在前）。"""
+    st = int(n.get("sticky") or 0)
+    return (0 if st else 1, -st, -int(n.get("modified") or 0))
 
 
 def _notes_cache_path():
@@ -2436,7 +2445,8 @@ def _notes_cache_load():
     try:
         with open(_notes_cache_path(), "rb") as f:
             o = json.loads(dpapi_unprotect(f.read()).decode("utf-8"))
-        if isinstance(o, dict) and isinstance(o.get("notes"), list):
+        if isinstance(o, dict) and isinstance(o.get("notes"), list) \
+                and int(o.get("ver") or 0) == NOTES_CACHE_VER:
             return o
     except Exception:
         pass
@@ -2445,7 +2455,8 @@ def _notes_cache_load():
 
 def _notes_cache_save():
     try:
-        blob = json.dumps({"at": NOTES_CACHE.get("at") or 0,
+        blob = json.dumps({"ver": NOTES_CACHE_VER,
+                           "at": NOTES_CACHE.get("at") or 0,
                            "notes": NOTES_CACHE.get("notes") or [],
                            "folders": NOTES_CACHE.get("folders") or []},
                           ensure_ascii=False).encode("utf-8")
@@ -2503,15 +2514,20 @@ def _notes_touch(item=None, drop_ids=None):
             "created": int(item.get("created") or 0),
             "folder": str(item.get("folder") or "0"),
             "enc": bool(item.get("enc")),
+            "sticky": int(item.get("sticky") or 0),
         }
         for i, n in enumerate(items):
             if str(n.get("id")) == nid:
                 row["created"] = int(item.get("created") or n.get("created") or 0)
+                # 本地改标题/正文不应该把「置顶」弄丢：调用方没带 sticky 就沿用旧值
+                row["sticky"] = int(item.get("sticky")
+                                    if item.get("sticky") is not None
+                                    else (n.get("sticky") or 0))
                 items[i] = row
                 break
         else:
             items.append(row)
-        items.sort(key=lambda x: -(x.get("modified") or 0))
+        items.sort(key=_note_sort_key)
     NOTES_CACHE["notes"] = items
     NOTES_CACHE["at"] = time.time()    # 本地已经是最新的，不算过期
     _notes_recount()
@@ -2566,6 +2582,8 @@ def _notes_fetch_all(min_at=None):
             text = _plain(_dec_field(e, "snippet"))
             flat = re.sub(r"\s+", " ", text).strip()
             title = (extra.get("title") or "").strip() or e.get("subject") or ""
+            st = e.get("setting")
+            sticky = int((st or {}).get("stickyTime") or 0) if isinstance(st, dict) else 0
             notes.append({
                 "id": nid,
                 "title": title or flat[:18] or "（无标题）",
@@ -2574,8 +2592,9 @@ def _notes_fetch_all(min_at=None):
                 "created": int(e.get("createDate") or 0),
                 "folder": str(e.get("folderId") or "0"),
                 "enc": bool(e.get("encryptInfo")),
+                "sticky": sticky,
             })
-        notes.sort(key=lambda x: -x["modified"])
+        notes.sort(key=_note_sort_key)
 
         counts = {}
         for n in notes:
@@ -2642,6 +2661,7 @@ def note_detail(nid):
     except Exception:
         extra = {}
     body = _plain(_dec_field(e, "content")) or _plain(_dec_field(e, "snippet"))
+    st = e.get("setting")
     return {
         "id": nid,
         "title": (extra.get("title") or e.get("subject") or "无标题"),
@@ -2650,6 +2670,8 @@ def note_detail(nid):
         "modified": int(e.get("modifyDate") or 0),
         "created": int(e.get("createDate") or 0),
         "tag": str(e.get("tag") or ""),
+        "folder": str(e.get("folderId") or "0"),
+        "sticky": int((st or {}).get("stickyTime") or 0) if isinstance(st, dict) else 0,
     }
 
 
