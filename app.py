@@ -5276,18 +5276,36 @@ def _style_native_titlebar(win):
         return
     try:
         import ctypes
-        hwnd = int(win.native.Handle.ToInt64())
+        u = ctypes.windll.user32
+        # 先按标题找顶层窗口；win.native 在部分 pywebview 版本里不是 Form，
+        # 直接取 .Handle 会抛异常，导致整段染色静默失效。
+        hwnd = u.FindWindowW(None, "小米云")
+        if not hwnd:
+            try:
+                h = int(win.native.Handle.ToInt64())
+                hwnd = u.GetAncestor(h, 2) or h   # GA_ROOT
+            except Exception:
+                hwnd = 0
+        if not hwnd:
+            return
         dwm = ctypes.windll.dwmapi.DwmSetWindowAttribute
+
         def set_attr(attr, value):
             try:
                 dwm(hwnd, ctypes.c_int(attr), ctypes.byref(ctypes.c_int(value)), 4)
             except Exception:
                 pass
-        # COLORREF: 0x00BBGGRR，不是 RGB 直填
-        set_attr(20, 1)                 # 沉浸式深色
-        set_attr(35, 0x00160E0A)        # 标题栏底色 #0A0E16
-        set_attr(36, 0x00FAF5F2)        # 标题文字 #F2F5FA
-        set_attr(34, 0x00160E0A)        # 边框同色
+
+        def paint():
+            # COLORREF: 0x00BBGGRR，不是 RGB 直填
+            set_attr(20, 1)                 # 沉浸式深色
+            set_attr(35, 0x00100A07)        # 标题栏底色 #070910，和页面顶部同色
+            set_attr(36, 0x00FAF5F2)        # 标题文字 #F2F5FA
+            set_attr(34, 0x00100A07)        # 边框同色
+
+        paint()
+        # loaded 时窗口刚出来，Win11 偶尔会晚一拍才接受 caption color；再补一次
+        threading.Timer(0.45, paint).start()
     except Exception:
         pass
 
