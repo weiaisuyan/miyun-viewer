@@ -5299,7 +5299,7 @@ def _style_native_titlebar(win):
         def paint():
             # COLORREF: 0x00BBGGRR，不是 RGB 直填
             set_attr(20, 1)                 # 沉浸式深色
-            set_attr(35, 0x00100A07)        # 标题栏底色 #070910，和页面顶部同色
+            set_attr(35, 0x00202020)        # 标题栏底色 #202020，和页面顶栏渐变同色
             set_attr(36, 0x00FAF5F2)        # 标题文字 #F2F5FA
             set_attr(34, 0x00100A07)        # 边框同色
 
