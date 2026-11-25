@@ -691,7 +691,7 @@ header .hacts .sep{width:1px;height:18px;background:var(--line-2);margin:0 3px}
 #todoBody{display:flex;flex-direction:column;gap:12px;margin:0 20px}
 
 /* 一条代办 = 一张独立卡片（用户要求：不要堆成一张大表） */
-.todo{display:flex;align-items:flex-start;gap:12px;padding:15px 16px;
+.todo{display:flex;align-items:center;gap:14px;padding:15px 16px;
   background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-lg);
   box-shadow:var(--shadow-1);
   transition:background .13s var(--ease),border-color .13s var(--ease),transform .13s var(--ease);
@@ -1915,7 +1915,7 @@ header #btnNew{min-width:0}
 .chip.on{background:linear-gradient(180deg,rgba(10,132,255,.34),rgba(10,132,255,.16));
   border-color:rgba(90,170,255,.45);color:#e6f1ff}
 .chip.on em{color:rgba(190,220,255,.82)}
-.note{position:relative;margin:1px 0;padding:9px 9px 9px 22px;border-radius:10px;
+.note{position:relative;margin:1px 0;padding:9px;border-radius:10px;
   border-bottom:none;transition:background var(--dur-2) var(--ease-out),
     box-shadow var(--dur-2) var(--ease-out)}
 .note:hover{background:rgba(255,255,255,.055)}
@@ -1982,13 +1982,13 @@ header #btnNew{min-width:0}
   box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 18px 38px -22px rgba(0,0,0,.8)}
 .todo:active{transform:translateY(-1px) scale(.997)}
 .todo .bx{
-  width:22px;height:22px;border-radius:50%;border:1.5px solid rgba(255,255,255,.30);
+  width:18px;height:18px;border-radius:50%;border:1.5px solid rgba(255,255,255,.30);
   background:rgba(255,255,255,.045);box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
 }
 .todo .bx:hover{border-color:#4aa6ff;background:rgba(10,132,255,.12);box-shadow:0 0 0 4px rgba(10,132,255,.10)}
 .todo.done .bx{background:linear-gradient(180deg,#49df7a,#22b94c);border-color:rgba(105,240,150,.65);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 0 0 4px rgba(48,209,88,.08)}
-.todo .bx svg{width:11px;height:11px;stroke-width:3.2}
+.todo .bx svg{width:10px;height:10px;stroke-width:3.2}
 .todo .tx{font-size:14.5px;line-height:1.58;letter-spacing:-.008em}
 .todo.done .tx > .ttl{color:var(--fg-3)}
 .todo .sub{margin-top:10px;gap:7px}
@@ -2205,9 +2205,10 @@ header #btnNew{min-width:0}
   background:linear-gradient(180deg,#2f9bff,#0a84ff);border-color:rgba(255,255,255,.10);color:#fff;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 4px 12px -6px rgba(10,132,255,.8)
 }
-/* 笔记列表的多选框单独小一号，并且不占正文缩进，左边不再空一大块 */
-.note .ncb{position:absolute;left:6px;top:11px;width:14px;height:14px;margin:0;
-  border-width:1px;border-color:rgba(255,255,255,.28)}
+/* 笔记列表的多选框：常驻显示、与标题行居中对齐、不压文字 */
+.note .ncb{position:relative;width:15px;height:15px;margin:2px 0 0;flex:none;
+  border-width:1px;border-color:rgba(255,255,255,.26);opacity:.42}
+.note .ncb::before{content:"";position:absolute;inset:-5px;border-radius:50%}
 .note .ncb svg{width:9px;height:9px;stroke-width:3}
 
 /* ---------- 14. 窄窗口：只改密度，不砍功能 ---------- */
