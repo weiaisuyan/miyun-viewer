@@ -2213,13 +2213,17 @@ header #btnNew{min-width:0}
 .note .ncb::before{content:"";position:absolute;inset:-5px;border-radius:50%}
 .note .ncb svg{width:9px;height:9px;stroke-width:3}
 
-/* ---------- 13.5 连续底板：侧栏、分类栏、笔记列表不再各自铺一块玻璃 ---------- */
+/* ---------- 13.5 连续底板：共用底色，但保留栏间分割线 ---------- */
 #side{
   background:transparent;
-  border-right:1px solid transparent;box-shadow:none;
+  border-right:1px solid rgba(255,255,255,.09);box-shadow:none;
   -webkit-backdrop-filter:none;backdrop-filter:none;
 }
-#left,#noteLeft,#noteList,#noteReader{
+#left,#noteLeft{
+  background:transparent;border-right:1px solid rgba(255,255,255,.09);box-shadow:none;
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+}
+#noteList,#noteReader{
   background:transparent;border-right-color:transparent;box-shadow:none;
   -webkit-backdrop-filter:none;backdrop-filter:none;
 }
