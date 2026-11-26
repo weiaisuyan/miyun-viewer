@@ -2633,19 +2633,6 @@ html.shell body{padding:0}
 #ctx.on{animation:ctxIn .13s var(--ease-out)}
 @media (prefers-reduced-motion: reduce){ #ctx.on{animation:none!important} }
 
-
-/* ---------- 选中态切换：让「谁被激活」看得见 ----------
-   左侧竖杠从中间长出来 + 底色渐入；未选中的那一项靠 transition 淡出。 */
-@keyframes navBarGrow{from{transform:scaleY(.15);opacity:0}to{transform:scaleY(1);opacity:1}}
-@keyframes navSelPop{0%{transform:scale(.94)}62%{transform:scale(1.04)}100%{transform:none}}
-.nav.on::before,#left .row.on::before{transform-origin:center;animation:navBarGrow .22s var(--ease-out)}
-.row{transition:background var(--dur-2) var(--ease-out),box-shadow var(--dur-2) var(--ease-out),color var(--dur-2) var(--ease-out)}
-.row .nm,.row .ct{transition:color var(--dur-2) var(--ease-out)}
-.chip.on,.vsw button.on{animation:navSelPop .2s var(--ease-out)}
-@media (prefers-reduced-motion: reduce){
-  .nav.on::before,#left .row.on::before,.chip.on,.vsw button.on{animation:none!important}
-}
-
 </style>
 </head>
 <body>
