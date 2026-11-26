@@ -56,7 +56,7 @@
 }
 *{box-sizing:border-box}
 /* 拖窗口边框时，页面把毛玻璃/过渡/动画全部关掉：不然每帧重绘毛玻璃，内容跟不上鼠标 */
-body.resizing *,body.resizing *::before,body.resizing *::after{
+body.win-resizing *,body.win-resizing *::before,body.win-resizing *::after{
   -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
   transition:none!important;animation:none!important;box-shadow:none!important}
 html,body{height:100%;margin:0}

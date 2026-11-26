@@ -163,8 +163,8 @@ namespace Miyun
             {
                 if (view.CoreWebView2 == null) return;
                 view.CoreWebView2.ExecuteScriptAsync(on
-                    ? "document.body.classList.add('resizing')"
-                    : "document.body.classList.remove('resizing')");
+                    ? "document.body.classList.add('win-resizing')"
+                    : "document.body.classList.remove('win-resizing')");
             }
             catch { }
         }
