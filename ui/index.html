@@ -2588,12 +2588,14 @@ header,header .htitle,header .spacer,#brand{cursor:default}
 /* ---------- 窗口缩放热区（WPF 壳模式）----------
    网页铺满整窗后，父窗口收不到鼠标消息，所以四边/四角由网页自己接：
    按下后通过 chrome.webview.postMessage 通知壳改窗口尺寸。 */
-#rz{position:fixed;inset:0;z-index:99999;pointer-events:none}
+#rz{position:fixed;inset:0;z-index:60;pointer-events:none}
 #rz i{position:absolute;pointer-events:auto;display:block}
 #rz i.n{top:0;left:8px;right:8px;height:5px;cursor:ns-resize}
 #rz i.s{bottom:0;left:8px;right:8px;height:5px;cursor:ns-resize}
 #rz i.w{left:0;top:8px;bottom:8px;width:5px;cursor:ew-resize}
 #rz i.e{right:0;top:8px;bottom:8px;width:5px;cursor:ew-resize}
+/* 最大化时不能拉边缩放，热区留着只会把光标变成缩放箭头 */
+html.max-win #rz i{display:none}
 #rz i.nw{top:0;left:0;width:10px;height:10px;cursor:nwse-resize}
 #rz i.ne{top:0;right:0;width:10px;height:10px;cursor:nesw-resize}
 #rz i.sw{bottom:0;left:0;width:10px;height:10px;cursor:nesw-resize}
@@ -3218,6 +3220,9 @@ function syncPanelGrip(){
 const TAB_SCROLL = {};
 function rememberTabScroll(){ TAB_SCROLL[TAB] = ($('#content') || {}).scrollTop || 0; }
 function restoreTabScroll(){
+  /* 相册自己有 gal.scroll 记忆 + 虚拟列表，别再插一手，
+     否则可能把列表滚到还没渲染的高度上，看起来像「一直加载不出来」 */
+  if(TAB === 'gallery') return;
   const y = TAB_SCROLL[TAB] || 0;
   if(!y) return;
   const c = $('#content');
@@ -9653,6 +9658,14 @@ document.addEventListener('keydown', e => {
   function post(o){
     try{ window.chrome.webview.postMessage(JSON.stringify(o)); }catch(e){}
   }
+  try{
+    window.chrome.webview.addEventListener('message', function(ev){
+      var d = String(ev.data || '');
+      if(d.indexOf('max|') === 0){
+        document.documentElement.classList.toggle('max-win', d.slice(4) === '1');
+      }
+    });
+  }catch(_){}
   var cur = null;
   wrap.addEventListener('pointerdown', function(e){
     var d = e.target && e.target.className;

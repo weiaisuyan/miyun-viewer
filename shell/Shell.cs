@@ -99,6 +99,7 @@ namespace Miyun
             Loaded += OnLoaded;
             StateChanged += delegate { UpdateMaxGlyph(); };
             rsTimer.Tick += delegate { rsTimer.Stop(); SetResizing(false); };
+            StateChanged += delegate { SendMaxState(); };
             Closing += delegate { SaveGeom(); KillBackend(); };
         }
 
@@ -293,6 +294,7 @@ namespace Miyun
                 var env = await CoreWebView2Environment.CreateAsync(null, ud, null);
                 await view.EnsureCoreWebView2Async(env);
                 view.CoreWebView2.WebMessageReceived += OnWebMessage;
+                view.CoreWebView2.NavigationCompleted += delegate { SendMaxState(); };
                 view.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
                 view.CoreWebView2.Settings.IsStatusBarEnabled = false;
                 view.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
@@ -395,6 +397,19 @@ namespace Miyun
 
         /* ---------- 网页端缩放热区 → 壳改窗口尺寸 ---------- */
         double rsL, rsT, rsW, rsH;
+
+        /* 最大化之后边框缩放没意义，而且会把光标变成缩放箭头；
+           把窗口状态告诉网页，由网页自己把四边热区关掉。 */
+        void SendMaxState()
+        {
+            try
+            {
+                if (view.CoreWebView2 == null) return;
+                view.CoreWebView2.PostWebMessageAsString(
+                    WindowState == WindowState.Maximized ? "max|1" : "max|0");
+            }
+            catch { }
+        }
 
         void OnWebMessage(object sender, Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs e)
         {
