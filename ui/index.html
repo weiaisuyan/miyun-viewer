@@ -2633,6 +2633,15 @@ html.shell body{padding:0}
 #ctx.on{animation:ctxIn .13s var(--ease-out)}
 @media (prefers-reduced-motion: reduce){ #ctx.on{animation:none!important} }
 
+
+/* ---------- 中间栏折叠：切页签时宽度渐变，内容区不再横跳 ----------
+   有些页签没有中栏（笔记/云盘/录音），原来是 display:none 直接消失，内容区左边界会瞬移 236px。 */
+#left{transition:width .2s var(--ease-out),flex-basis .2s var(--ease-out),
+  opacity .16s var(--ease-out),padding .2s var(--ease-out),border-right-width .2s var(--ease-out)}
+#left.collapsed{width:0;flex:0 0 0;opacity:0;padding-left:0;padding-right:0;
+  border-right-width:0;overflow:hidden}
+@media (prefers-reduced-motion: reduce){ #left{transition:none} }
+
 </style>
 </head>
 <body>
@@ -3247,6 +3256,15 @@ function flashTabEnter(){
   }, 600);
 }
 
+
+/* 中栏显隐：用宽度动画代替 display 硬切 */
+function showLeft(on){
+  const l = $('#left');
+  if(!l) return;
+  l.style.display = '';
+  l.classList.toggle('collapsed', !on);
+}
+
 function moveNavPill(){
   const pill = $('#navPill');
   if(!pill) return;
@@ -3366,7 +3384,7 @@ function clearSel(){
 $('#btnSelClear').onclick = clearSel;
 
 async function renderTab(){
-  $('#left').style.display=''; $('#left').innerHTML=''; $('#left').classList.remove('gal');
+  showLeft(true); $('#left').innerHTML=''; $('#left').classList.remove('gal');
   const c=$('#content');
   c.style.overflow='auto'; c.scrollTop=0; c.onscroll=null;
   /* 不再在切页签时统一铺「标题 + 12 个方块」的骨架：
@@ -5293,7 +5311,7 @@ async function renderNotes(opt){
   setHead('笔记'); setDl(false);
   showBtn('#btnNew', true, '新建笔记', 'i-plus');
   if(!state.noteView) state.noteView = {folder:'all', todo:false};
-  $('#left').style.display = 'none';        // 分类改用列表顶部的 chips
+  showLeft(false);   // 分类改用列表顶部的 chips
   const c = $('#content');
   c.style.overflow = 'hidden';
   if(!$('#noteShell') || !$('#noteLeft')) c.innerHTML = '';
@@ -5854,7 +5872,7 @@ function leaveNoteEditor(){
     r.innerHTML = '';
   }
   const nl = $('#noteList'); if(nl) nl.style.display = '';
-  $('#left').style.display = 'none';
+  showLeft(false);
 }
 
 /* 编辑中点别的笔记 / 切页签 / 新建之前先过这一关：
@@ -5880,7 +5898,7 @@ function openNoteEditor(note){
   r.style.display = 'flex';
   r.style.flexDirection = 'column';
   /* 编辑时左侧笔记列表保持可见（只占右栏），切走时也看得见上下文 */
-  $('#left').style.display = 'none';
+  showLeft(false);
   const nl = $('#noteList'); if(nl) nl.style.display = '';
   r.innerHTML = `<div id="noteEdit">
     <div class="ehead">
@@ -6161,7 +6179,7 @@ async function renderTodos(force){
       const m = String(e.message||'');
       if(m === 'strongauth'){
         // 待办在小米那边属于敏感服务：静默续期换来的票打不通，要重新扫码一次
-        $('#left').style.display='none';
+        showLeft(false);
         c.innerHTML = `<div class="empty" style="padding:60px 20px">
           <div class="big2">${ICO('i-lock','xl')}</div>
           待办需要重新验证身份<br>
@@ -6250,7 +6268,7 @@ async function refreshTodosQuiet(){
 function drawTodoFilters(){
   const t = state.todos || [];
   const open = t.filter(x=>!x.done).length, done = t.length - open;
-  $('#left').style.display=''; $('#left').classList.remove('gal');
+  showLeft(true); $('#left').classList.remove('gal');
   $('#left').innerHTML = `<div class="row${state.todoView==='all'?' on':''}" data-v="all">
       <span class="nm">全部</span><span class="ct">${t.length}</span></div>
     <div class="row${state.todoView==='open'?' on':''}" data-v="open">
@@ -6517,7 +6535,7 @@ function recordRowsGrouped(list){
 async function renderRecords(force){
   setHead('录音'); setDl(true); state.selHint='';
   showBtn('#btnTrash', true, '录音回收站', 'i-trash');
-  $('#left').style.display='none';
+  showLeft(false);
   /* 只要成功加载过一次就算「有缓存」，哪怕当时是 0 条：
      否则录音为空的账户每次切回来都要再闪一次骨架 */
   const cached = !force && state.recordsWarm && Array.isArray(state.records);
@@ -6931,7 +6949,7 @@ async function openTrash(){
 /* ============ 云盘管理 ============ */
 async function renderDrive(){
   setHead('云盘'); setDl(false);
-  $('#left').style.display='none';
+  showLeft(false);
   showBtn('#btnNew', true, '新建文件夹', 'i-folder-plus');
   /* 切回云盘不再重置到根目录、也不再铺骨架：
      上次停在哪个文件夹、列表里有什么，原样先画出来，再后台核一遍第一页。
