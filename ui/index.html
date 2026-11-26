@@ -3249,6 +3249,85 @@ function showLeft(on){
   l.classList.toggle('collapsed', !on);
 }
 
+
+/* ---------- 缩略图加载队列 ----------
+   一次把整片卡片的 src 都设上去，浏览器会同时发起几十个请求互相抢带宽，
+   滚动时该出现的那几张反而排在后面。这里改成：只在需要时取，
+   全局最多 6 个并发（正好是 Chromium 单域名上限），按插入顺序先到先得。 */
+const THUMB_Q = { lim: 6, run: 0, q: [] };
+function thumbEnqueue(img){
+  if(!img || !img.dataset || !img.dataset.thumb || img.dataset.thumbQ) return;
+  img.dataset.thumbQ = '1';
+  THUMB_Q.q.push(img);
+  thumbPump();
+}
+function thumbPump(){
+  while(THUMB_Q.run < THUMB_Q.lim && THUMB_Q.q.length){
+    const img = THUMB_Q.q.shift();
+    if(!img.isConnected){ continue; }
+    const url = img.dataset.thumb;
+    THUMB_Q.run++;
+    let done = false;
+    /* 注意：卡片模板自带 onload="imgOk(this)"（负责把图片从 opacity:0 点亮、
+       并移除占位块）。这里只能用 addEventListener，绝不能赋值 img.onload，
+       否则会把模板里的处理器覆盖掉 —— 图加载成功了也一直不可见。 */
+    const fin = () => {
+      if(done) return;
+      done = true;
+      img.removeEventListener('load', fin);
+      img.removeEventListener('error', fin);
+      clearTimeout(wd);
+      THUMB_Q.run = Math.max(0, THUMB_Q.run - 1);
+      thumbPump();
+    };
+    const wd = setTimeout(fin, 15000);      // 卡住的图不要永久占坑
+    img.addEventListener('load', fin);
+    img.addEventListener('error', fin);
+    img.src = url;
+  }
+}
+function thumbSweep(root){
+  const r = root || document;
+  if(r.nodeType === 1 && r.tagName === 'IMG') thumbEnqueue(r);
+  if(r.querySelectorAll) r.querySelectorAll('img[data-thumb]').forEach(thumbEnqueue);
+}
+try{
+  new MutationObserver(muts => {
+    for(const m of muts){
+      for(const n of m.addedNodes){
+        if(n && n.nodeType === 1) thumbSweep(n);
+      }
+    }
+  }).observe(document.documentElement, {childList:true, subtree:true});
+}catch(_){}
+
+
+/* ---------- 大图翻页预取 ----------
+   看第 N 张时，顺手把 N+1 / N-1 的预览图和缩略图放进缓存，原片只预取「下一张」，
+   这样按左右键基本不用等；已经预取过的 URL 不重复请求。 */
+const PREFETCHED = new Set();
+function prefetchAround(){
+  let list, i;
+  try{ list = viewerList(); i = list.indexOf(vCurrent); }catch(_){ return; }
+  if(!list || i < 0) return;
+  const cand = [];
+  const next = list[i+1], prev = list[i-1];
+  [next, prev].forEach(it => {
+    if(!it || it.type === 'video') return;
+    if(it.bigUrl) cand.push(it.bigUrl);
+    if(it.thumbUrl) cand.push(it.thumbUrl);
+  });
+  /* 原片体积大，只预取下一张，避免往回翻也一直下载 */
+  if(next && next.type !== 'video' && next.fullUrl) cand.push(next.fullUrl);
+  cand.forEach(u => {
+    if(!u || PREFETCHED.has(u)) return;
+    PREFETCHED.add(u);
+    const im = new Image();
+    im.decoding = 'async';
+    im.src = u;
+  });
+}
+
 function moveNavPill(){
   const pill = $('#navPill');
   if(!pill) return;
@@ -4965,7 +5044,7 @@ function cardHTML(it){
   const isVid = it.type==='video';
   return `<div class="card${sel.has(it.id)?' sel':''}" data-key="${esc(it.id)}" tabindex="0">
     <div class="ph"></div>
-    ${it.thumbUrl?`<img loading="lazy" decoding="async" src="${esc(it.thumbUrl)}" alt=""
+    ${it.thumbUrl?`<img loading="lazy" decoding="async" data-thumb="${esc(it.thumbUrl)}" alt=""
         draggable="true" onload="imgOk(this)" onerror="imgFail(this)">`:''}
     ${isVid?`<span class="vt">${ICO('i-play','fill')}视频${it.dur? ' '+fmtClock(it.dur) : ''}</span>`:''}
     <span class="tick" role="checkbox" aria-checked="${sel.has(it.id)}" title="选择">${ICO('i-check')}</span>
@@ -6806,7 +6885,7 @@ async function openTrash(){
   const cardHTML = x => `
       <div class="card${state.trashSel.has(x.id)?' sel':''}" data-id="${esc(x.id)}">
         <div class="ph"></div>
-        ${(x.thumbUrl||x.thumb)?`<img loading="lazy" decoding="async" src="${esc(x.thumbUrl||x.thumb)}" alt=""
+        ${(x.thumbUrl||x.thumb)?`<img loading="lazy" decoding="async" data-thumb="${esc(x.thumbUrl||x.thumb)}" alt=""
             onload="imgOk(this)" onerror="imgFail(this)">`:''}
         ${x.type==='video'?`<span class="vt">${ICO('i-play','fill')}视频</span>`:''}
         <span class="tick" role="checkbox">${ICO('i-check')}</span>
@@ -7830,6 +7909,7 @@ function openViewer(it, opts){
     const vv = $('#viewer');
     vv.classList.remove('vin'); void vv.offsetWidth; vv.classList.add('vin');
   }
+  setTimeout(prefetchAround, 150);  // 先让当前这张开始加载，再预取前后各一张
   const vEl = $('#viewer');
   vEl.classList.add('opening');
   setTimeout(() => vEl.classList.remove('opening'), 320);
@@ -9027,6 +9107,7 @@ async function boot(){
 }
 
 boot();
+setTimeout(() => thumbSweep(), 0);
 /* ============================================================
    体验增强层：搜索 / 快捷键 / 滚动记忆 / 网络 / 命令面板
    全部新增，不改原来的渲染入口；只在各页过滤函数里加一层判断。
