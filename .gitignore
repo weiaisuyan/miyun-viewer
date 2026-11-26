@@ -24,3 +24,8 @@ __pycache__/
 .claude/
 .vscode/
 .idea/
+
+# 调试脚本与本机测试数据（含登录票，绝不能提交）
+_dev/
+shell/dist/
+shell/lib/

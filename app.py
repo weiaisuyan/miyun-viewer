@@ -5064,7 +5064,14 @@ def _ensure_login_once():
         print("[登录] 本地有 %d 张候选 serviceToken" % len(cands))
         for i, tok in enumerate(cands):
             keep_only_token(s, tok)
-            if verify_session(s):
+            try:
+                _ok = verify_session(s)
+            except Exception as _e:
+                # 网络问题不是票据问题：停下来等重试，绝不把本地票判死
+                set_login("checking", "网络不可用", "连不上小米服务器，稍后自动重试 …", pct=5)
+                print("[登录] 网络异常，暂停校验（不动本地票）：%s" % _e)
+                return False
+            if _ok:
                 # verify 这一下服务端可能已经轮换出票了，必须把 TOKEN 同步成
                 # 轮换后的那张，否则下一个请求还在用旧票 —— 立刻 401。
                 fresh = service_tokens(s)
@@ -5270,24 +5277,55 @@ def _months_via(group_id, sess):
     return out
 
 
+def _strip_native_caption(hwnd):
+    """去掉系统标题栏（连同标题栏上的「小米云」），保留 WS_THICKFRAME。
+
+    这样窗口还有标准的四边/四角拉伸边框和 DWM 阴影，但顶部不再有一条
+    和页面割裂的原生标题栏；拖动、最小化、最大化、关闭全部由页面自己画。
+    """
+    if os.name != 'nt' or not hwnd:
+        return
+    try:
+        import ctypes
+        u = ctypes.windll.user32
+        GWL_STYLE = -16
+        WS_CAPTION = 0x00C00000
+        WS_THICKFRAME = 0x00040000
+        WS_SYSMENU = 0x00080000
+        WS_MINIMIZEBOX = 0x00020000
+        WS_MAXIMIZEBOX = 0x00010000
+        style = u.GetWindowLongW(hwnd, GWL_STYLE)
+        new = ((style & ~WS_CAPTION) | WS_THICKFRAME | WS_SYSMENU
+               | WS_MINIMIZEBOX | WS_MAXIMIZEBOX)
+        if new != style:
+            u.SetWindowLongW(hwnd, GWL_STYLE, new)
+            # NOSIZE | NOMOVE | NOZORDER | NOACTIVATE | FRAMECHANGED
+            u.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0004 | 0x0010 | 0x0020)
+    except Exception:
+        pass
+
+
 def _style_native_titlebar(win):
-    """Windows 11：把系统标题栏染成和页面同一块深色玻璃，避免顶上一条灰杠。"""
+    """Windows 11：去掉原生标题栏，并把窗口边框/圆角交给 DWM 画成深色。"""
     if os.name != 'nt':
         return
     try:
         import ctypes
         u = ctypes.windll.user32
-        # 先按标题找顶层窗口；win.native 在部分 pywebview 版本里不是 Form，
-        # 直接取 .Handle 会抛异常，导致整段染色静默失效。
-        hwnd = u.FindWindowW(None, "小米云")
+        # 先拿自己这个窗口的句柄：同时开着两个实例时按标题 FindWindow 会抓错窗口。
+        hwnd = 0
+        try:
+            h = int(win.native.Handle.ToInt64())
+            hwnd = u.GetAncestor(h, 2) or h   # GA_ROOT
+        except Exception:
+            hwnd = 0
         if not hwnd:
-            try:
-                h = int(win.native.Handle.ToInt64())
-                hwnd = u.GetAncestor(h, 2) or h   # GA_ROOT
-            except Exception:
-                hwnd = 0
+            hwnd = u.FindWindowW(None, "小米云")
         if not hwnd:
             return
+
+        _strip_native_caption(hwnd)
+
         dwm = ctypes.windll.dwmapi.DwmSetWindowAttribute
 
         def set_attr(attr, value):
@@ -5297,17 +5335,107 @@ def _style_native_titlebar(win):
                 pass
 
         def paint():
-            # COLORREF: 0x00BBGGRR，不是 RGB 直填
             set_attr(20, 1)                 # 沉浸式深色
-            set_attr(35, 0x00202020)        # 标题栏底色 #202020，和页面顶栏渐变同色
-            set_attr(36, 0x00FAF5F2)        # 标题文字 #F2F5FA
-            set_attr(34, 0x00100A07)        # 边框同色
+            set_attr(33, 2)                 # 圆角（Win11）
+            set_attr(34, -2)                # DWMWA_COLOR_NONE：不画外描边
+            _strip_native_caption(hwnd)
 
         paint()
         # loaded 时窗口刚出来，Win11 偶尔会晚一拍才接受 caption color；再补一次
         threading.Timer(0.45, paint).start()
     except Exception:
         pass
+
+
+class WinChrome:
+    """自绘标题栏的 JS 桥：拖动 / 最小化 / 最大化-还原 / 关闭。
+
+    pywebview 的宿主是 WinForms，没有 WPF 的 WindowChrome，这里用等价的 Win32 做法：
+    去掉 WS_CAPTION 但保留 WS_THICKFRAME，拖拽发 WM_NCLBUTTONDOWN + HTCAPTION，
+    交给 Windows 自己的移动循环 —— 贴边吸附、跨屏拖动这些系统行为都还在。
+    """
+
+    def __init__(self):
+        self.win = None
+        self.hwnd = 0
+
+    def attach(self, win):
+        self.win = win
+        try:
+            import ctypes
+            h = int(win.native.Handle.ToInt64())
+            self.hwnd = int(ctypes.windll.user32.GetAncestor(h, 2) or h)
+        except Exception:
+            self.hwnd = 0
+
+    def _handle(self):
+        if self.hwnd:
+            return self.hwnd
+        if os.name != 'nt':
+            return 0
+        try:
+            import ctypes
+            self.hwnd = int(ctypes.windll.user32.FindWindowW(None, "小米云") or 0)
+        except Exception:
+            self.hwnd = 0
+        return self.hwnd
+
+    def win_pos(self):
+        """当前窗口位置（逻辑像素，给 JS 拖动算增量用）。"""
+        try:
+            return [int(self.win.x), int(self.win.y)]
+        except Exception:
+            return [0, 0]
+
+    def win_move(self, x, y):
+        """按逻辑像素移动窗口；JS 每帧调用一次。"""
+        try:
+            self.win.move(int(x), int(y))
+            return True
+        except Exception:
+            return False
+
+    def drag(self):
+        if os.name != 'nt':
+            return False
+        try:
+            import ctypes
+            u = ctypes.windll.user32
+            h = self._handle()
+            if not h:
+                return False
+            u.ReleaseCapture()
+            u.SendMessageW(h, 0x00A1, 2, 0)      # WM_NCLBUTTONDOWN / HTCAPTION
+            return True
+        except Exception:
+            return False
+
+    def minimize(self):
+        try:
+            self.win.minimize()
+            return True
+        except Exception:
+            return False
+
+    def toggle_max(self):
+        try:
+            if _WIN_STATE.get("max"):
+                self.win.restore()
+                return False
+            self.win.maximize()
+            return True
+        except Exception:
+            return bool(_WIN_STATE.get("max"))
+
+    def is_max(self):
+        return bool(_WIN_STATE.get("max"))
+
+    def close(self):
+        try:
+            self.win.destroy()
+            return True
+        except Exception:
+            return False
 
 
 # ── 窗口几何：记住上次的位置 / 大小 / 最大化，下次按原样打开 ────────
@@ -5353,6 +5481,14 @@ def _window_start_geom():
     return w, h, x, y, mx
 
 
+def _restyle_later(win, delay=0.08):
+    """最大化/还原后 WinForms 会重算边框样式，过一拍再把 WS_CAPTION 去掉。"""
+    try:
+        threading.Timer(delay, lambda: _style_native_titlebar(win)).start()
+    except Exception:
+        pass
+
+
 def _save_window_geom(win):
     try:
         g = {
@@ -5377,8 +5513,78 @@ def _save_window_geom(win):
         print("[窗口] 保存位置失败：%s" % e)
 
 
+def _geo_line(text):
+    try:
+        p = os.path.join(res_dir(), "_dev", "geo.log")
+        with open(p, "a", encoding="utf-8") as fh:
+            fh.write(text + "\n")
+    except Exception:
+        pass
+    try:
+        print("[geo] " + text)
+    except Exception:
+        pass
+
+
+def _drag_selftest(win):
+    """自查：JS 桥里到底有没有 drag 这个函数、顶栏的 mousedown 有没有接上。
+    只在 _dev\\geo.log 里留一行诊断，不改任何行为。"""
+    try:
+        ok = win.evaluate_js(
+            "JSON.stringify({bridge: !!(window.pywebview && window.pywebview.api),"
+            " hasDrag: !!(window.pywebview && window.pywebview.api && window.pywebview.api.drag),"
+            " hdr: !!document.querySelector('header'),"
+            " spacer: !!document.querySelector('header .spacer')})")
+        _geo_line("selftest bridge=" + str(ok))
+        r = win.evaluate_js(
+            "(function(){var el=document.querySelector('header .spacer')||document.querySelector('header');"
+            "if(!el) return 'no-el';"
+            "el.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,cancelable:true,view:window,"
+            "button:0,detail:1,clientX:600,clientY:24}));return 'dispatched';})()")
+        _geo_line("selftest dispatch=" + str(r))
+    except Exception as e:
+        _geo_line("selftest 异常 %s %s" % (type(e).__name__, e))
+
+
+def _log_geo(win, tag=""):
+    """诊断：窗体客户区 vs WebView2 控件矩形。两者不一致 = 拆掉标题栏后
+    WinForms 没有重新排布子控件（顶上一条横条、拖动时内容跟不上都是它）。"""
+    try:
+        f = win.native
+        cr = f.ClientRectangle
+        wv = getattr(win, "webview", None) or getattr(f, "webview", None)
+        wb = wv.Bounds if wv is not None else None
+        line = "%s  form.Size=%s  form.Client=%s  webview.Bounds=%s" % (
+            tag, f.Size, cr, wb)
+        try:
+            p = os.path.join(res_dir(), "_dev", "geo.log")
+            with open(p, "a", encoding="utf-8") as fh:
+                fh.write(line + "\n")
+        except Exception:
+            pass
+        print("[geo] " + line)
+    except Exception as e:
+        print("[geo] 失败 %s %s" % (type(e).__name__, e))
+
+
 def main():
     global WV_CDP_PORT
+    # WPF 壳模式：只起本地服务，不开窗（窗口由 C# 壳负责）。
+    #   python app.py --headless --port 12345
+    headless = "--headless" in sys.argv
+    fixed_port = 0
+    for i, a in enumerate(sys.argv):
+        if a == "--port" and i + 1 < len(sys.argv):
+            try:
+                fixed_port = int(sys.argv[i + 1])
+            except Exception:
+                fixed_port = 0
+        elif a.startswith("--port="):
+            try:
+                fixed_port = int(a.split("=", 1)[1])
+            except Exception:
+                fixed_port = 0
+
     print("=" * 56)
     print(" 小米云 · 只读查看器")
     print("=" * 56)
@@ -5413,10 +5619,11 @@ def main():
 
     # 先把窗口和服务起来，再去取票：这样取票慢的时候界面能显示进度，
     # 而不是黑屏等一分钟。
-    srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    srv = ThreadingHTTPServer(("127.0.0.1", fixed_port), Handler)
     port = srv.server_address[1]
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     print("本地服务：http://127.0.0.1:%d" % port)
+    print("READY %d" % port)
     # 上次续期时刻：决定这次启动要不要补一次（票的续期窗口只有 30 天）
     _PASS_KEEP_AT[0] = _load_keepalive_at()
     threading.Thread(target=ensure_login, daemon=True).start()
@@ -5424,19 +5631,41 @@ def main():
     threading.Thread(target=_prewarm_timeline, daemon=True).start()
     threading.Thread(target=_prewarm_todos, daemon=True).start()
 
+    if headless:
+        # 壳模式：服务已经起来了，剩下的交给 C# 壳，这里不进 webview 循环
+        print("[壳模式] 服务已就绪，等待壳关闭进程")
+        try:
+            while True:
+                time.sleep(3600)
+        except KeyboardInterrupt:
+            return
+
     _gw, _gh, _gx, _gy, _gmax = _window_start_geom()
+    chrome = WinChrome()
     win = webview.create_window("小米云", "http://127.0.0.1:%d/" % port,
                                 width=_gw, height=_gh, x=_gx, y=_gy,
                                 maximized=_gmax,
                                 min_size=(980, 640),
-                                text_select=True)      # 允许选中/复制便签正文
+                                text_select=True,      # 允许选中/复制便签正文
+                                background_color='#0a0f18',   # 无原生标题栏后顶上不能露白
+                                js_api=chrome)
     try:
-        win.events.maximized += lambda *_: _WIN_STATE.__setitem__("max", True)
-        win.events.restored += lambda *_: _WIN_STATE.__setitem__("max", False)
+        win.events.maximized += lambda *_: (
+            _WIN_STATE.__setitem__("max", True), _restyle_later(win))
+        win.events.restored += lambda *_: (
+            _WIN_STATE.__setitem__("max", False), _restyle_later(win))
         win.events.closing += lambda *_: _save_window_geom(win)
     except Exception as e:
         print("[窗口] 几何事件绑定失败：%s" % e)
-    win.events.loaded += lambda *_: _style_native_titlebar(win)
+
+    def _on_loaded():
+        chrome.attach(win)
+        _style_native_titlebar(win)
+        _log_geo(win, "loaded")
+        threading.Timer(1.2, lambda: _log_geo(win, "loaded+1.2s")).start()
+        threading.Timer(2.5, lambda: _drag_selftest(win)).start()
+
+    win.events.loaded += lambda *_: _on_loaded()
     # 窗口/任务栏图标：和 exe 图标、界面左上角 logo 用同一张 app.ico
     icon = os.path.join(res_dir(), "app.ico")
     # storage_path 固定下来：不用每次新建一个临时目录，退出时 pywebview

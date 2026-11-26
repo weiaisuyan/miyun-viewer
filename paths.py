@@ -11,8 +11,18 @@ import sys
 
 def data_dir():
     """可写目录：登录票、appKey、缩略图缓存都放这里。"""
-    # 源码调试时用 MIYUN_DATA_DIR 指到打包版的目录，直接复用已登录的 session.dat
+    # 1) 环境变量（源码调试、壳进程传递）
     d = (os.environ.get("MIYUN_DATA_DIR") or "").strip()
+    # 2) 命令行 --data-dir：WPF 壳直接传，避免 .cmd 按 GBK 解析中文路径
+    if not d:
+        for i, a in enumerate(sys.argv):
+            if a == "--data-dir" and i + 1 < len(sys.argv):
+                d = sys.argv[i + 1]
+                break
+            if a.startswith("--data-dir="):
+                d = a.split("=", 1)[1]
+                break
+        d = (d or "").strip()
     if d and os.path.isdir(d):
         return d
     if getattr(sys, "frozen", False):

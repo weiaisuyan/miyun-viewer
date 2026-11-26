@@ -55,6 +55,10 @@
   --mono:"Cascadia Mono","Cascadia Code",Consolas,"Microsoft YaHei",monospace;
 }
 *{box-sizing:border-box}
+/* 拖窗口边框时，页面把毛玻璃/过渡/动画全部关掉：不然每帧重绘毛玻璃，内容跟不上鼠标 */
+body.resizing *,body.resizing *::before,body.resizing *::after{
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+  transition:none!important;animation:none!important;box-shadow:none!important}
 html,body{height:100%;margin:0}
 body{
   background:var(--bg);color:var(--fg);overflow:hidden;
@@ -912,7 +916,7 @@ header .hacts .sep{width:1px;height:18px;background:var(--line-2);margin:0 3px}
 #viewer img.vimg{will-change:transform;transform-origin:center center;
   transition:transform .12s ease-out;display:block;cursor:grab;max-width:none;max-height:none}
 #viewer .stage.drag img.vimg{transition:none;cursor:grabbing}
-#viewer video{max-width:100%;max-height:100%;display:none;background:#000;border-radius:var(--r-sm);outline:none}
+#viewer video{width:100%;height:100%;max-width:none;max-height:none;object-fit:contain;display:none;background:transparent;border-radius:var(--r-sm);outline:none}
 /* 视频取原片/转码期间：先显示这张视频封面（比例和视频一致），就绪后直接换成播放器 */
 #viewer .vposter{display:none;position:absolute;left:50%;top:50%;
   transform:translate(-50%,-50%);max-width:100%;max-height:100%;border-radius:6px;
@@ -959,7 +963,7 @@ header .hacts .sep{width:1px;height:18px;background:var(--line-2);margin:0 3px}
 #viewer:hover .nav{opacity:1}
 #viewer .nav.hide{display:none}
 #viewerLoading{position:absolute;inset:0;display:none;place-items:center;color:#cfd7e3;
-  background:rgba(4,5,7,.72);z-index:2;text-align:center}
+  background:transparent;z-index:2;text-align:center}
 /* 取原片时的加载卡片：给足留白，别再挤成一个小条 */
 #viewerLoading .vbox{width:min(460px,78vw);padding:34px 32px 26px;
   background:var(--surface-2);border:1px solid var(--line-3);border-radius:18px;
@@ -1617,8 +1621,8 @@ h1,h2,h3,.mbox h3,#login h3,.gate h3{font-family:var(--font-display);}
 /* ---------- 2. 墙纸：玻璃要透出一点颜色，才不是一块灰板 ---------- */
 #ambient{
   background:
-    /* 顶部 40px 与 Windows 原生标题栏同色，再往下 80px 渐回深色，接缝消失 */
-    linear-gradient(180deg,#202020 0px,#1E2026 40px,rgba(16,20,28,0) 120px),
+    /* 顶部 14px 与 Windows 非客户区边框同色（#101420），那条横条就看不出来了 */
+    linear-gradient(180deg,#101420 0px,#101420 14px,rgba(18,22,31,.55) 46px,rgba(16,20,28,0) 132px),
     radial-gradient(1200px 860px at 84% -18%, rgba(10,132,255,.20), transparent 64%),
     radial-gradient(920px 720px at -12% 40%, rgba(94,92,230,.13), transparent 68%),
     radial-gradient(820px 620px at 20% 108%, rgba(48,209,88,.065), transparent 64%),
@@ -1706,8 +1710,8 @@ h1,h2,h3,.mbox h3,#login h3,.gate h3{font-family:var(--font-display);}
 
 /* ---------- 4. 顶栏：一条轻柔的工具条 ---------- */
 header{
-  height:54px;flex:0 0 54px;padding:0 20px 0 24px;gap:12px;
-  background:linear-gradient(180deg,#202020 0px,#1B1E25 20px,rgba(15,19,28,.92) 54px);
+  height:54px;flex:0 0 54px;--hp-r:20px;padding:0 var(--hp-r) 0 24px;gap:12px;
+  background:linear-gradient(180deg,#101420 0px,#101420 14px,rgba(20,24,34,.90) 34px,rgba(13,17,25,.80) 54px);
   border-bottom:1px solid rgba(255,255,255,0);
   -webkit-backdrop-filter:blur(36px) saturate(180%);
   backdrop-filter:blur(36px) saturate(180%);
@@ -1722,6 +1726,23 @@ header .hacts .sep{height:20px;background:rgba(255,255,255,.08);margin:0 4px}
 header #btnNew,header #btnTrash{height:32px;padding:0 14px;border-radius:10px}
 header #btnNew{min-width:0}
 .iconbtn{width:32px;height:32px;border-radius:10px;color:var(--fg-2)}
+/* ---------- 4.1 自绘标题栏按钮：贴在窗口右边缘，和系统按钮同尺寸 ---------- */
+/* WPF 壳模式：窗口按钮和品牌由壳画在原生标题栏上，页面里这两块要隐藏 */
+html.shell #winbtns,html.shell #brand{display:none}
+html.shell #side > .nav:first-of-type{margin-top:12px}
+#winbtns{display:flex;align-self:stretch;align-items:stretch;margin-left:8px;
+  margin-right:calc(var(--hp-r) * -1)}
+#winbtns .wbtn{width:46px;border:0;padding:0;background:transparent;color:var(--fg-2);
+  display:grid;place-items:center;border-radius:0;cursor:default;
+  transition:background .1s linear,color .1s linear}
+#winbtns .wbtn svg.i{width:13px;height:13px;stroke-width:1.25}
+#winbtns .wbtn:hover{background:rgba(255,255,255,.10);color:#fff}
+#winbtns .wbtn:active{background:rgba(255,255,255,.18)}
+#winbtns .wbtn.close:hover{background:#e81123;color:#fff}
+#winbtns .wbtn.close:active{background:#c50f1f}
+/* 可拖动区域：顶栏留白与左上角品牌区（按钮/输入框不算） */
+header .htitle,header .spacer,#brand{-webkit-user-select:none;user-select:none}
+header,header .htitle,header .spacer,#brand{cursor:default}
 .btn.sm{height:30px;border-radius:10px}
 .btn.xs{height:26px;border-radius:8px}
 .btn{height:32px;border-radius:10px;font-size:12.5px}
@@ -2232,7 +2253,7 @@ header #btnNew{min-width:0}
 /* ---------- 14. 窄窗口：只改密度，不砍功能 ---------- */
 @media (max-width:1120px){
   #left,#noteLeft{width:var(--panel-w);flex:0 0 var(--panel-w)}
-  header{padding:0 16px 0 20px}
+  header{--hp-r:16px;padding:0 var(--hp-r) 0 20px}
   #notePad{padding:38px 36px 44px}
   #noteEdit #neBody{padding:24px 36px 90px}
   #content .day{padding:24px 22px 0;padding-right:66px}
@@ -2250,7 +2271,7 @@ header #btnNew{min-width:0}
   #side .foot{display:block;padding:10px 0 2px;margin-top:auto}
   #side .me{height:42px;padding:6px 0;justify-content:center}
   #side .mename,#side .megear{display:none}
-  header{height:52px;flex-basis:52px;padding:0 12px 0 16px}
+  header{height:52px;flex-basis:52px;--hp-r:12px;padding:0 var(--hp-r) 0 16px}
   header h1{font-size:15px}
   header .sub{display:none}
   header .hacts{gap:6px}
@@ -2447,9 +2468,11 @@ header #btnNew{min-width:0}
 #netBar{position:fixed;left:0;right:0;top:0;height:0;overflow:hidden;z-index:90;
   display:flex;align-items:center;justify-content:center;gap:8px;
   font-size:11.5px;letter-spacing:.02em;color:#f0c674;
-  background:rgba(226,168,61,.12);border-bottom:1px solid rgba(226,168,61,.26);
+  background:rgba(226,168,61,.12);border-bottom:0 solid rgba(226,168,61,.26);
   transition:height .2s var(--ease)}
-#netBar.on{height:26px}
+/* 收起时必须连边框一起收：height:0 不会裁掉自己的 border-bottom，
+   否则页面顶上永远留一条 1px 琥珀色横线 */
+#netBar.on{height:26px;border-bottom-width:1px}
 #netBar svg.i{width:13px;height:13px}
 
 /* Toast 三态：成功 / 失败 / 进行中 */
@@ -2561,6 +2584,21 @@ header #btnNew{min-width:0}
   #content.scrollfade{-webkit-mask-image:none;mask-image:none}
   #splash,#cmdk .cb{animation:none;transition:none}
 }
+
+/* ---------- 窗口缩放热区（WPF 壳模式）----------
+   网页铺满整窗后，父窗口收不到鼠标消息，所以四边/四角由网页自己接：
+   按下后通过 chrome.webview.postMessage 通知壳改窗口尺寸。 */
+#rz{position:fixed;inset:0;z-index:99999;pointer-events:none}
+#rz i{position:absolute;pointer-events:auto;display:block}
+#rz i.n{top:0;left:8px;right:8px;height:5px;cursor:ns-resize}
+#rz i.s{bottom:0;left:8px;right:8px;height:5px;cursor:ns-resize}
+#rz i.w{left:0;top:8px;bottom:8px;width:5px;cursor:ew-resize}
+#rz i.e{right:0;top:8px;bottom:8px;width:5px;cursor:ew-resize}
+#rz i.nw{top:0;left:0;width:10px;height:10px;cursor:nwse-resize}
+#rz i.ne{top:0;right:0;width:10px;height:10px;cursor:nesw-resize}
+#rz i.sw{bottom:0;left:0;width:10px;height:10px;cursor:nesw-resize}
+#rz i.se{bottom:0;right:0;width:10px;height:10px;cursor:nwse-resize}
+html.shell body{padding:0}
 </style>
 </head>
 <body>
@@ -2612,6 +2650,11 @@ header #btnNew{min-width:0}
   <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M9.6 5.8l6.2 6.2-6.2 6.2"/></symbol>
 <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.6 3.6v4.7h-4.7"/></symbol>
   <symbol id="i-close" viewBox="0 0 24 24"><path d="M6.4 6.4l11.2 11.2M17.6 6.4L6.4 17.6"/></symbol>
+  <!-- 自绘标题栏的窗口按钮：最小化沿用 i-minus，最大化/还原用这两个 -->
+  <symbol id="i-winmax" viewBox="0 0 24 24"><rect x="5.4" y="5.4" width="13.2" height="13.2" rx="1.2"/></symbol>
+  <symbol id="i-winrestore" viewBox="0 0 24 24">
+    <rect x="4.4" y="8.4" width="11.2" height="11.2" rx="1.1"/>
+    <path d="M8.2 8.4V5.9a1.1 1.1 0 011.1-1.1h9.2a1.1 1.1 0 011.1 1.1v9.2a1.1 1.1 0 01-1.1 1.1h-2.5"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.4v13.2M5.4 12h13.2"/></symbol>
   <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5.4 12h13.2"/></symbol>
   <symbol id="i-expand" viewBox="0 0 24 24">
@@ -2706,6 +2749,15 @@ header #btnNew{min-width:0}
         <svg class="i"><use href="#i-grid"/></svg></button>
       <button class="iconbtn" id="btnRefresh" title="刷新数据">
         <svg class="i"><use href="#i-refresh"/></svg></button>
+    </div>
+    <!-- 自绘标题栏：原生标题栏已去掉，这三个就是窗口按钮（贴窗口右边缘） -->
+    <div id="winbtns">
+      <button class="wbtn" id="wMin" type="button" title="最小化" aria-label="最小化">
+        <svg class="i"><use href="#i-minus"/></svg></button>
+      <button class="wbtn" id="wMax" type="button" title="最大化" aria-label="最大化">
+        <svg class="i"><use href="#i-winmax"/></svg></button>
+      <button class="wbtn close" id="wClose" type="button" title="关闭" aria-label="关闭">
+        <svg class="i"><use href="#i-close"/></svg></button>
     </div>
   </header>
   <div id="body">
@@ -2870,6 +2922,12 @@ header #btnNew{min-width:0}
 <script>
 /* ============ 基础 ============ */
 const $ = s => document.querySelector(s);
+/* WPF 壳模式：原生标题栏由壳画，页面里隐藏自绘按钮与侧栏品牌 */
+try{
+  if(window.chrome && window.chrome.webview && !window.pywebview){
+    document.documentElement.classList.add('shell');
+  }
+}catch(e){}
 const $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const ICO = (id, cls='') => `<svg class="i ${cls}"><use href="#${id}"/></svg>`;
@@ -6393,7 +6451,9 @@ async function renderRecords(force){
   setHead('录音'); setDl(true); state.selHint='';
   showBtn('#btnTrash', true, '录音回收站', 'i-trash');
   $('#left').style.display='none';
-  const cached = !force && Array.isArray(state.records) && state.records.length;
+  /* 只要成功加载过一次就算「有缓存」，哪怕当时是 0 条：
+     否则录音为空的账户每次切回来都要再闪一次骨架 */
+  const cached = !force && state.recordsWarm && Array.isArray(state.records);
   if(cached){
     /* 上次已经加载过的列表先画出来：切回录音页签不再走一遍骨架 → 数据 */
     $('#content').innerHTML = `<div class="subhead"><span id="recCount"></span></div>
@@ -6415,11 +6475,13 @@ async function renderRecords(force){
     <div class="lists" id="recList">${recordSkeleton()}</div>`;
   attachInfinite(recordsMore);
   await recordsMore();
+  state.recordsWarm = true;
 }
 
 /* 录音页的后台补刷：只拉最新第一页，原地替换，不闪骨架；正在多选就不动列表 */
 async function refreshRecordsQuiet(){
   if(TAB !== 'record' || sel.size) return;
+  if((state.off || 0) > 100) return;          // 已加载多页，避免被第一页覆盖
   const btn = $('#btnRefresh');
   if(btn) btn.classList.add('spin');
   try{
@@ -6804,13 +6866,52 @@ async function renderDrive(){
   setHead('云盘'); setDl(false);
   $('#left').style.display='none';
   showBtn('#btnNew', true, '新建文件夹', 'i-folder-plus');
-  await driveOpen(0, []);
+  /* 切回云盘不再重置到根目录、也不再铺骨架：
+     上次停在哪个文件夹、列表里有什么，原样先画出来，再后台核一遍第一页。
+     以前这里是 driveOpen(0, [])，于是每次切回来都是「骨架 → 内容」闪一下，
+     还顺手把你所在的文件夹踢回根目录。 */
+  const parent = state.parent != null ? state.parent : 0;
+  const trail  = Array.isArray(state.trail) ? state.trail : [];
+  const warm = state.driveWarm && (state.driveItems || []).length;
+  if(warm){
+    paintDriveShell(parent, trail);
+    redrawDriveList && redrawDriveList();
+    attachInfinite(driveMore);
+    setTimeout(driveRefreshQuiet, 0);
+    return;
+  }
+  await driveOpen(parent, trail);
+}
+
+/* 只搭壳（面包屑 + 列表容器），不铺骨架行 */
+function paintDriveShell(parent, trail){
+  state.parent=parent; state.trail=trail; state.driveActive=null;
+  const c=$('#content');
+  c.innerHTML = `<div class="lists">
+      <div id="crumb"></div>
+      <div id="driveList" class="${state.driveView==='grid'?'grid':''}"></div></div>`;
+  drawCrumb();
+}
+
+/* 后台把第一页拉回来原地替换：不闪骨架、不动多选 */
+async function driveRefreshQuiet(){
+  if(TAB !== 'drive' || sel.size || state.loading) return;
+  if((state.drivePage || 2) > 2) return;      // 已经翻过好几页，别用第一页截断列表
+  try{
+    const r = await api(`/api/drive?parent=${encodeURIComponent(state.parent)}&page=1`);
+    if(TAB !== 'drive' || sel.size) return;
+    state.driveItems = (r.items || []).slice();
+    state.drivePage = 2;
+    state.driveEnded = !r.hasMore;
+    redrawDriveList && redrawDriveList();
+  }catch(e){ }
 }
 
 async function driveOpen(parent, trail){
   state.parent=parent; state.trail=trail;
   state.driveActive = null;
   state.driveItems=[]; state.drivePage=1; state.driveEnded=false; state.loading=false;
+  state.driveWarm = false;
   const c=$('#content');
   c.innerHTML = `<div class="lists">
       <div id="crumb"></div>
@@ -6819,6 +6920,7 @@ async function driveOpen(parent, trail){
   drawCrumb();
   attachInfinite(driveMore);
   await driveMore();
+  state.driveWarm = true;
 }
 
 function drawCrumb(){
@@ -9385,6 +9487,104 @@ document.addEventListener('keydown', e => {
   }, {passive:true});
 })();
 
+/* ---------- 自绘标题栏：拖动 / 最小化 / 最大化-还原 / 关闭 ----------
+   原生标题栏已在 app.py 里去掉了（只保留 WS_THICKFRAME，四边仍可拉伸）。
+   拖拽交给 Windows 自己的移动循环（WM_NCLBUTTONDOWN + HTCAPTION），
+   所以贴边吸附、双屏移动这些系统行为都还在。 */
+(function bindWinChrome(){
+  const api = () => (window.pywebview && window.pywebview.api) || null;
+  const call = (fn, ...args) => {
+    const a = api();
+    if(!a || typeof a[fn] !== 'function') return Promise.resolve(null);
+    try{ return Promise.resolve(a[fn](...args)); }catch(e){ return Promise.resolve(null); }
+  };
+  let maxed = false;
+  function paintMax(){
+    const b = $('#wMax'); if(!b) return;
+    b.innerHTML = `<svg class="i"><use href="#${maxed ? 'i-winrestore' : 'i-winmax'}"/></svg>`;
+    b.title = maxed ? '还原' : '最大化';
+    b.setAttribute('aria-label', b.title);
+  }
+  async function syncMax(){
+    const v = await call('is_max');
+    if(v !== null){ maxed = !!v; paintMax(); }
+  }
+  const min = $('#wMin'), mx = $('#wMax'), cl = $('#wClose');
+  if(min) min.onclick = () => call('minimize');
+  if(mx) mx.onclick = () => call('toggle_max').then(syncMax);
+  if(cl) cl.onclick = () => call('close');
+  window.addEventListener('pywebviewready', () => setTimeout(syncMax, 150));
+  let rt = null;
+  window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(syncMax, 160); });
+
+  const inChrome = el => !!(el && el.closest && el.closest('header, #brand'));
+  const interactive = el => !!(el && el.closest && el.closest(
+    'button, input, textarea, select, a, .nav, #searchWrap, .hacts, #winbtns, .me, #tl'));
+  /* 拖动：按屏幕坐标逐帧移动窗口。
+     不用 WM_NCLBUTTONDOWN + HTCAPTION —— 那条路依赖窗口捕获状态，实测拖不动。 */
+  let drag = null;
+  document.addEventListener('pointerdown', e => {
+    if(e.button !== 0 || e.isPrimary === false) return;
+    if(!inChrome(e.target) || interactive(e.target)) return;
+    e.preventDefault();
+    call('win_pos').then(pos => {
+      if(!pos || pos.length < 2) return;
+      drag = {sx: e.screenX, sy: e.screenY, wx: pos[0], wy: pos[1]};
+      document.body.classList.add('win-dragging');
+    });
+  }, true);
+  window.addEventListener('pointermove', e => {
+    if(!drag) return;
+    const x = drag.wx + (e.screenX - drag.sx);
+    const y = drag.wy + (e.screenY - drag.sy);
+    call('win_move', x, y);
+  }, {passive:true});
+  const endDrag = () => {
+    if(!drag) return;
+    drag = null;
+    document.body.classList.remove('win-dragging');
+  };
+  window.addEventListener('pointerup', endDrag);
+  window.addEventListener('pointercancel', endDrag);
+  document.addEventListener('dblclick', e => {
+    if(!inChrome(e.target) || interactive(e.target)) return;
+    e.preventDefault();
+    call('toggle_max').then(syncMax);
+  }, true);
+})();
+
+
+/* ---------- WPF 壳：四边/四角缩放 ---------- */
+(function bindShellResize(){
+  if(!(window.chrome && window.chrome.webview) || window.pywebview) return;
+  var dirs = ['n','s','e','w','ne','nw','se','sw'];
+  var wrap = document.createElement('div');
+  wrap.id = 'rz';
+  var html = '';
+  for(var i = 0; i < dirs.length; i++) html += '<i class="' + dirs[i] + '"></i>';
+  wrap.innerHTML = html;
+  document.body.appendChild(wrap);
+  function post(o){
+    try{ window.chrome.webview.postMessage(JSON.stringify(o)); }catch(e){}
+  }
+  var cur = null;
+  wrap.addEventListener('pointerdown', function(e){
+    var d = e.target && e.target.className;
+    if(!d) return;
+    if(e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    cur = {d: d, sx: e.screenX, sy: e.screenY};
+    post('rzstart|' + d);
+    try{ e.target.setPointerCapture(e.pointerId); }catch(_){}
+  }, true);
+  window.addEventListener('pointermove', function(e){
+    if(!cur) return;
+    post('rzmove|' + cur.d + '|' + (e.screenX - cur.sx) + '|' + (e.screenY - cur.sy));
+  }, {passive: true, capture: true});
+  function end(){ if(!cur) return; cur = null; post('rzend'); }
+  window.addEventListener('pointerup', end, true);
+  window.addEventListener('pointercancel', end, true);
+})();
 /* ---------- 启动闪屏兜底 ---------- */
 setTimeout(() => {
   const s = $('#splash');

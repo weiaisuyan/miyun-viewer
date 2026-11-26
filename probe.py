@@ -475,12 +475,20 @@ def load_all_cookies():
 
 
 def verify_session(session):
+    """校验这张票还能不能用。
+
+    网络异常（DNS/代理/断网）必须往外抛，不能当成「票无效」：断网时返回 False
+    会让上层误判登录失效、把本地 passToken 写坏，只能重新扫码。
+    """
     try:
         r = session.get(API + "/gallery/user/album/list",
                         params={"pageNum": 0, "pageSize": 1, "isShared": "false"},
                         timeout=20)
         return r.status_code == 200 and (r.json() or {}).get("result") == "ok"
-    except Exception:
+    except Exception as e:
+        if type(e).__name__ in ("ConnectionError", "ConnectTimeout", "ReadTimeout",
+                                "Timeout", "SSLError", "ProxyError"):
+            raise
         return False
 
 
