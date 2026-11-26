@@ -2814,11 +2814,12 @@ def _todo_parse(ent):
                     for s in j.get("subTodoEntities") or []]
         except Exception:
             pass
-    # 完成状态以 markFinishTime 为准：完成时才写这个时间戳；
-    # isFinish 这个字段在服务端恒为 1，不能用来判断。
-    # 例外是「有子项且子项全做完」的清单：小米客户端把它显示成已完成，
-    # 但父项自己的 markFinishTime 仍是 0。
-    done = bool(ent.get("markFinishTime")) or bool(subs) and all(s["done"] for s in subs)
+    # 完成状态以 isFinish 为准（0/1）。
+    # 这里踩过两个坑，都实测过（2026-11-27 抓云端原始记录对比）：
+    # 1) markFinishTime 在「完成后又取消」时服务端不清零，会残留，
+    #    所以不能拿它判断——以前就是它把手机上未完成的条目全划成已完成；
+    # 2) is_finish 与 isFinish 语义相反（3397 条里 3392 条相反），不可靠，忽略。
+    done = bool(ent.get("isFinish"))
     return {
         "title": title.strip() or "（空代办）",
         "subs": subs,
