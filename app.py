@@ -2884,6 +2884,22 @@ def _todo_fetch_all(min_at=0):
             if nxt == token:
                 break
             token = nxt
+        # 去重：云端同一件事可能重复存在（createTime 一模一样、syncId 不同、完成时间差几小时）。
+        # 症状是「官方的」「很快就」这类条在列表里出现两次，与手机端对不上。
+        # 保留规则：优先未完成的那条；都完成就保留完成时间最新的。
+        best = {}
+        for it in out:
+            k = (it["title"], it["created"])
+            cur = best.get(k)
+            if cur is None:
+                best[k] = it
+            elif cur["done"] and not it["done"]:
+                best[k] = it
+            elif cur["done"] == it["done"] and it["finished"] > cur["finished"]:
+                best[k] = it
+        if len(best) != len(out):
+            print("[代办] 去重：%d -> %d 条" % (len(out), len(best)))
+        out = list(best.values())
         out.sort(key=lambda x: (x["done"], -(x["created"] or 0)))
         TODO_CACHE.update({"at": time.time(), "items": out,
                            "maxId": max_id or None, "maxSort": max_sort or None,
