@@ -6966,7 +6966,11 @@ async function driveRefreshQuiet(){
   try{
     const r = await api(`/api/drive?parent=${encodeURIComponent(state.parent)}&page=1`);
     if(TAB !== 'drive' || sel.size) return;
-    state.driveItems = (r.items || []).slice();
+    const items = (r.items || []).slice();
+    /* 上次停留的文件夹可能已经被删/被移动：这时别把空列表画出来（看着像云盘坏了），
+       直接退回根目录重新加载。 */
+    if(!items.length && state.parent !== 0 && state.parent != null){ driveOpen(0, []); return; }
+    state.driveItems = items;
     state.drivePage = 2;
     state.driveEnded = !r.hasMore;
     redrawDriveList && redrawDriveList();
