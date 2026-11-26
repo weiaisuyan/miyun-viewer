@@ -2601,16 +2601,10 @@ header,header .htitle,header .spacer,#brand{cursor:default}
 html.shell body{padding:0}
 
 /* ---------- 动效层：切换/入场只动 transform+opacity ---------- */
-@keyframes tabIn{from{opacity:0;transform:translate3d(0,9px,0)}to{opacity:1;transform:none}}
-@keyframes rowIn{from{opacity:0;transform:translate3d(0,7px,0)}to{opacity:1;transform:none}}
-.tab-enter{animation:tabIn .2s var(--ease-out) both}
-.tab-enter > *{animation:rowIn .24s var(--ease-out) both}
-.tab-enter > *:nth-child(1){animation-delay:0ms}
-.tab-enter > *:nth-child(2){animation-delay:22ms}
-.tab-enter > *:nth-child(3){animation-delay:44ms}
-.tab-enter > *:nth-child(4){animation-delay:66ms}
-.tab-enter > *:nth-child(5){animation-delay:88ms}
-.tab-enter > *:nth-child(n+6){animation-delay:100ms}
+@keyframes tabIn{from{opacity:0}to{opacity:1}}
+/* 只淡入、不做位移和逐行错开：位移与错开会在切页签时造成「跳」的观感 */
+.tab-enter{animation:tabIn .16s var(--ease-out) both}
+.tab-enter > *{animation:none}
 /* 侧栏导航：点下去有一点回弹，选中时图标轻轻右移 */
 .nav:active{transform:scale(.985)}
 .nav.on svg.i{transform:translateX(1.5px)}
@@ -3221,6 +3215,18 @@ function syncPanelGrip(){
 /* 选中胶囊：位置不在每个 nav 上写死，而是一条元素滑过去 */
 
 /* 切页签时给内容区和左侧栏一次入场动画；只在真正换页签时触发 */
+const TAB_SCROLL = {};
+function rememberTabScroll(){ TAB_SCROLL[TAB] = ($('#content') || {}).scrollTop || 0; }
+function restoreTabScroll(){
+  const y = TAB_SCROLL[TAB] || 0;
+  if(!y) return;
+  const c = $('#content');
+  if(!c) return;
+  c.scrollTop = y;
+  /* 内容可能是异步补上的，高度还没到位就再试两次 */
+  setTimeout(() => { const el = $('#content'); if(el){ el.scrollTop = y; } }, 60);
+  setTimeout(() => { const el = $('#content'); if(el){ el.scrollTop = y; } }, 180);
+}
 function flashTabEnter(){
   var els = [$('#content'), $('#left')];
   els.forEach(function(el){
@@ -3229,6 +3235,7 @@ function flashTabEnter(){
     void el.offsetWidth;                 // 强制重排，动画才能重放
     el.classList.add('tab-enter');
   });
+  restoreTabScroll();
   clearTimeout(flashTabEnter._t);
   flashTabEnter._t = setTimeout(function(){
     els.forEach(function(el){ if(el) el.classList.remove('tab-enter'); });
@@ -3271,6 +3278,7 @@ $$('.nav').forEach(n=>n.onclick=()=>{
     return;
   }
   if(!leaveEditorIfNeeded()) return;           // 笔记编辑中切页签先确认，别丢草稿
+  rememberTabScroll();
   saveCurrentTabState();
   if(window.UX) uxSaveScroll();
   $$('.nav').forEach(x=>x.classList.toggle('on',x===n));
@@ -3279,6 +3287,7 @@ $$('.nav').forEach(n=>n.onclick=()=>{
   moveNavPill();
   renderTab();
   flashTabEnter();
+  /* 注意：scrollTop 在 renderTab 里被清零，所以先记住再渲染 —— 见上面的 rememberTabScroll 调用 */
 });
 moveNavPill();
 
