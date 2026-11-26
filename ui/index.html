@@ -8716,13 +8716,31 @@ function paintAccount(a){
   const av = $('#meAva'), nm = $('#meName');
   if(av) av.innerHTML = a.avatar ? `<img src="${esc(a.avatar)}" alt="">`
                                  : `<b>${esc((a.name || '?').slice(0, 1))}</b>`;
+  /* 头像图偶发加载失败（CDN 抽风/登录票刚就绪），失败后换一个 query 再试一次，
+     不然左下角会一直空着，非得点开「设置」把 account 重新拉一遍才出现。 */
+  const im = av && av.querySelector('img');
+  if(im && !im.dataset.retry){
+    im.addEventListener('error', () => {
+      if(im.dataset.retry) return;
+      im.dataset.retry = '1';
+      setTimeout(() => {
+        im.src = a.avatar + (a.avatar.indexOf('?') >= 0 ? '&' : '?') + 'r=' + Date.now();
+      }, 900);
+    });
+  }
   if(nm){
     nm.textContent = a.name || '已登录';
     nm.title = (a.name || '') + (a.userId ? ' · ' + a.userId : '');
   }
 }
-async function refreshAccount(){
-  try{ paintAccount(await api('/api/account')); }catch(e){}
+async function refreshAccount(tries){
+  /* 开机瞬间登录票可能还没就绪，/api/account 会 401；以前只调一次，
+     失败就永远没有头像和昵称。这里退避重试几轮。 */
+  if(tries == null) tries = 8;
+  try{ paintAccount(await api('/api/account')); }
+  catch(e){
+    if(tries > 0) setTimeout(() => refreshAccount(tries - 1), 1500);
+  }
 }
 
 /* ============ 本地缓存 ============ */
