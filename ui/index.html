@@ -3910,8 +3910,10 @@ async function renderGallery(){
     d = {albums: state.albums};
     lay = state.layout;
   }else{
-    /* 第一次进相册不铺骨架屏：直接等接口（后端有缓存，通常几十毫秒），
-       拿到就按真实布局画，不再「先闪一片方块再变成照片」。 */
+    /* 第一次进相册不铺骨架屏：直接等接口（后端有缓存，通常几十毫秒）。
+       但一定要先把上一页的内容清掉——否则接口慢的时候，画面会停在旧页面 1~2 秒。 */
+    $('#content').innerHTML = '';
+    $('#left').innerHTML = '';
     try{ [d, lay] = await Promise.all([api('/api/albums'), api('/api/album_layout')]); }
     catch(e){ if(String(e.message)!=='auth') $('#content').innerHTML='<div class="empty">读取相簿失败</div>'; return; }
     if(TAB !== 'gallery') return;      // 页签已经切走，迟到的结果不要再画
@@ -4806,6 +4808,14 @@ async function loadAlbum(id, opts){
   if(gal.seq !== mySeq) return;
   if(TAB !== 'gallery') return;        // 页签已经切走，迟到的索引不要再画
   if(!idx.days || !idx.days.length){
+    /* 索引空有两种可能：真空，或者刚好撞上登录票轮换（服务端返回空列表）。
+       先静默重试一次，别把「空的」直接甩给用户。 */
+    if(!o._retriedEmpty){
+      o._retriedEmpty = true;
+      await new Promise(r => setTimeout(r, 700));
+      if(gal.seq === mySeq && TAB === 'gallery') return loadAlbum(id, Object.assign({}, o, {fresh: true}));
+      return;
+    }
     hideTimeline();
     c.innerHTML = `<div class="empty"><div class="big2">${ICO('i-empty-photo','xl')}</div>这个相簿是空的<div class="ehint">照片上传后会自动出现在这里</div></div>`;
     return;
