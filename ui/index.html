@@ -2708,9 +2708,9 @@ html.shell body{padding:0}
     <span class="word">小米云</span>
     <span class="ver">Cloud</span>
   </div>
-  <div class="nav" data-tab="todo" title="代办"><svg class="i"><use href="#i-todo"/></svg><span>代办</span></div>
+  <div class="nav on" data-tab="todo" title="代办"><svg class="i"><use href="#i-todo"/></svg><span>代办</span></div>
   <div class="nav" data-tab="note" title="笔记"><svg class="i"><use href="#i-note"/></svg><span>笔记</span></div>
-  <div class="nav on" data-tab="gallery" title="相册"><svg class="i"><use href="#i-photo"/></svg><span>相册</span></div>
+  <div class="nav" data-tab="gallery" title="相册"><svg class="i"><use href="#i-photo"/></svg><span>相册</span></div>
   <div class="nav" data-tab="drive" title="云盘"><svg class="i"><use href="#i-folder"/></svg><span>云盘</span></div>
   <div class="nav" data-tab="record" title="录音"><svg class="i"><use href="#i-mic"/></svg><span>录音</span></div>
   <div id="sideGrip" title="拖动调整宽度，双击复位"></div>
@@ -3038,7 +3038,7 @@ function fallbackCopy(txt){
   ta.remove(); return ok;
 }
 
-let TAB='gallery', sel=new Set();
+let TAB='todo', sel=new Set();   // 默认打开代办
 const state={items:[],records:[],driveItems:[],notes:[],folders:[],albums:[],videoOnly:false,filling:false,
              notesAt:0,noteReadAt:{},
              layout:null,todos:null,todoView:null,canSel:false,selHint:'',

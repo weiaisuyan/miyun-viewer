@@ -27,7 +27,13 @@ import io
 import mimetypes
 import shutil
 import requests
-import webview
+
+# pywebview 只在「自己开窗口」时才需要。壳模式（--headless）下窗口由 WPF 壳负责，
+# 这里不导入它，打包后端时也就不用带 pythonnet，能省掉一坨运行期依赖。
+try:
+    import webview
+except Exception:      # pragma: no cover
+    webview = None
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -5070,6 +5076,13 @@ def _ensure_login_once():
                 # 网络问题不是票据问题：停下来等重试，绝不把本地票判死
                 set_login("checking", "网络不可用", "连不上小米服务器，稍后自动重试 …", pct=5)
                 print("[登录] 网络异常，暂停校验（不动本地票）：%s" % _e)
+                def _retry_later():
+                    time.sleep(8)
+                    try:
+                        ensure_login()
+                    except Exception:
+                        pass
+                threading.Thread(target=_retry_later, daemon=True).start()
                 return False
             if _ok:
                 # verify 这一下服务端可能已经轮换出票了，必须把 TOKEN 同步成
@@ -5640,6 +5653,9 @@ def main():
         except KeyboardInterrupt:
             return
 
+    if webview is None:
+        print('[窗口] 没有 pywebview，无法创建窗口；请用 --headless 配合 WPF 壳运行')
+        return 1
     _gw, _gh, _gx, _gy, _gmax = _window_start_geom()
     chrome = WinChrome()
     win = webview.create_window("小米云", "http://127.0.0.1:%d/" % port,

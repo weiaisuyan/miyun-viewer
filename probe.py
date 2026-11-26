@@ -483,7 +483,7 @@ def verify_session(session):
     try:
         r = session.get(API + "/gallery/user/album/list",
                         params={"pageNum": 0, "pageSize": 1, "isShared": "false"},
-                        timeout=20)
+                        timeout=40)   # 代理慢的时候 20s 会误判成「网络异常」
         return r.status_code == 200 and (r.json() or {}).get("result") == "ok"
     except Exception as e:
         if type(e).__name__ in ("ConnectionError", "ConnectTimeout", "ReadTimeout",

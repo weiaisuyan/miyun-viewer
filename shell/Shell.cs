@@ -35,7 +35,14 @@ namespace Miyun
     {
         const double BAR = 40;
         const string Brand = "小米云";
-        const string DataDir = @"D:\程序\小米云";
+        // 数据目录 = 程序所在目录（session.dat / cache 就放在 exe 旁边）。
+        // 想放别处：在这个目录下建一个 data\ 子目录，程序会优先用它。
+        static string DataDirPath()
+        {
+            string b = AppDomain.CurrentDomain.BaseDirectory;
+            string d = Path.Combine(b, "data");
+            return Directory.Exists(d) ? d : b;
+        }
 
         readonly WebView2 view = new WebView2();
         readonly TextBlock maxGlyph = new TextBlock();
@@ -471,7 +478,7 @@ namespace Miyun
             if (!File.Exists(cmd)) return;
 
             var psi = new ProcessStartInfo("cmd.exe",
-                "/c \"\"" + cmd + "\" " + port + " \"" + DataDir + "\"\"");
+                "/c \"\"" + cmd + "\" " + port + " \"" + DataDirPath() + "\"\"");
             psi.UseShellExecute = false;
             psi.CreateNoWindow = true;
             psi.WorkingDirectory = dir;
