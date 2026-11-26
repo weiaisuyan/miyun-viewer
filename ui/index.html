@@ -9014,7 +9014,16 @@ setInterval(async () => {
 async function boot(){
   let s={};
   try{ s = await (await fetch('/api/status')).json(); }catch(e){}
-  if(s.login){ renderTab(); flashTabEnter(); refreshCacheSize(); refreshAccount(); } else showLogin();
+  if(s.login){
+    renderTab(); flashTabEnter(); refreshCacheSize(); refreshAccount();
+    /* 默认停在代办，但相册是第二个最常去的页：后台先把相簿列表和布局取回来，
+       这样第一次切到相册不用等接口（后端本来就有缓存，这里只是提前） */
+    setTimeout(() => {
+      if(TAB === 'gallery') return;
+      api('/api/albums').then(d => { if(d && d.albums) state.albums = d.albums; }).catch(()=>{});
+      api('/api/album_layout').then(d => { if(d) state.layout = d; }).catch(()=>{});
+    }, 1500);
+  } else showLogin();
 }
 
 boot();
