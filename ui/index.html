@@ -2631,6 +2631,12 @@ html.shell body{padding:0}
 #viewer.vin .stage{animation:stageIn .26s var(--ease-out)}
 @media (prefers-reduced-motion: reduce){ #viewer.vin,#viewer.vin .stage{animation:none!important} }
 
+
+/* 右键菜单：从左上角轻微展开，避免硬弹 */
+@keyframes ctxIn{from{opacity:0;transform:translateY(-4px) scale(.985)}to{opacity:1;transform:none}}
+#ctx.on{animation:ctxIn .13s var(--ease-out)}
+@media (prefers-reduced-motion: reduce){ #ctx.on{animation:none!important} }
+
 </style>
 </head>
 <body>
