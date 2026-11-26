@@ -3831,7 +3831,8 @@ async function renderGallery(){
     d = {albums: state.albums};
     lay = state.layout;
   }else{
-    $('#content').innerHTML = skeleton();      // 第一次/没缓存：先给相册骨架，不露上一页
+    /* 第一次进相册不铺骨架屏：直接等接口（后端有缓存，通常几十毫秒），
+       拿到就按真实布局画，不再「先闪一片方块再变成照片」。 */
     try{ [d, lay] = await Promise.all([api('/api/albums'), api('/api/album_layout')]); }
     catch(e){ if(String(e.message)!=='auth') $('#content').innerHTML='<div class="empty">读取相簿失败</div>'; return; }
     if(TAB !== 'gallery') return;      // 页签已经切走，迟到的结果不要再画
@@ -3850,11 +3851,7 @@ async function renderGallery(){
   drawAlbums();
   gal.video = keepVideo;
   const target = keepVideo ? '0' : (keepAlbum ? keepAlbum.id : '0');
-  if(!galMemoPeek(target, keepVideo) && !galIndexFromCache(target)){
-    /* 内存里有这本相簿（索引 + 照片条目）就直接画，不再铺整页骨架；
-       只有这次运行还没打开过、本地也没索引时才给骨架。 */
-    $('#content').innerHTML = skeleton();
-  }
+  /* 没有缓存的那一次也不再铺骨架：下面 loadAlbum 会直接把占位卡片铺上去 */
   if(keepVideo) await loadAlbum('0', {video:true});
   else if(keepAlbum) await loadAlbum(keepAlbum.id);
   else await loadAlbum('0');
