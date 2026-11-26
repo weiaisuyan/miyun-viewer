@@ -6152,7 +6152,8 @@ async function renderTodos(force){
     /* 第一次进来：先把左侧筛选和「代办形状」的占位行画出来，再等接口 */
     state.todos = [];
     drawTodoFilters();
-    drawTodoSkeleton();
+    /* 不铺骨架屏：空着等接口回来直接画（后端有缓存，通常几十毫秒） */
+    $('#content').innerHTML = `<div id="todoWrap"><div id="todoBody"></div><div id="todoPager"></div></div>`;
   }
   if(!has || force){
     try{ const d = await api('/api/todos' + (force?'?refresh=1':'')); state.todos = d.todos || []; state.todosAt = d.at || 0; }
@@ -6538,7 +6539,7 @@ async function renderRecords(force){
   state.records=[]; state.off=0; state.ended=false; state.loading=false;
   state.recForce = true;          // 首次加载也强制要云端最新的第一页
   $('#content').innerHTML = `<div class="subhead"><span id="recCount">全部录音</span></div>
-    <div class="lists" id="recList">${recordSkeleton()}</div>`;
+    <div class="lists" id="recList"></div>`;
   attachInfinite(recordsMore);
   await recordsMore();
   state.recordsWarm = true;
@@ -6985,7 +6986,7 @@ async function driveOpen(parent, trail){
   const c=$('#content');
   c.innerHTML = `<div class="lists">
       <div id="crumb"></div>
-      <div id="driveList" class="${state.driveView==='grid'?'grid':''}">${driveSkeleton()}</div></div>`;
+      <div id="driveList" class="${state.driveView==='grid'?'grid':''}"></div></div>`;
   c.scrollTop=0;
   drawCrumb();
   attachInfinite(driveMore);
