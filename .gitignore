@@ -29,3 +29,6 @@ __pycache__/
 _dev/
 shell/dist/
 shell/lib/
+shell/dist_backend/
+shell/build_backend/
+shell/*.spec
