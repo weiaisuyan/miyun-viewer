@@ -2827,6 +2827,7 @@ def _todo_parse(ent):
         "created": int(ent.get("createTime") or 0),
         "remind": int(ent.get("remindTime") or 0),
         "finished": int(ent.get("markFinishTime") or 0),
+        "mod": int(ent.get("lastModifiedTime") or 0),   # 记录最后修改时间，用于同一条多条记录时取最新
     }
 
 
@@ -2885,18 +2886,18 @@ def _todo_fetch_all(min_at=0):
             if nxt == token:
                 break
             token = nxt
-        # 去重：云端同一件事可能重复存在（createTime 一模一样、syncId 不同、完成时间差几小时）。
-        # 症状是「官方的」「很快就」这类条在列表里出现两次，与手机端对不上。
-        # 保留规则：优先未完成的那条；都完成就保留完成时间最新的。
+        # 去重：云端同一件事可能重复存在（createTime 一模一样、id 不同、状态还相反）。
+        # 实测（2026-11-27，手机端就是唯一真值）：
+        #   「官方的」「很快就」各有两条，isFinish 一条 1 一条 0，
+        #   手机端显示为已完成 —— 对应的是 lastModifiedTime 更新的那条（isFinish=1）。
+        # 所以规则是：同标题+同创建时间，只保留 lastModifiedTime 最新的那条，状态由它决定。
         best = {}
         for it in out:
             k = (it["title"], it["created"])
             cur = best.get(k)
             if cur is None:
                 best[k] = it
-            elif cur["done"] and not it["done"]:
-                best[k] = it
-            elif cur["done"] == it["done"] and it["finished"] > cur["finished"]:
+            elif (it["mod"], it["finished"]) > (cur["mod"], cur["finished"]):
                 best[k] = it
         if len(best) != len(out):
             print("[代办] 去重：%d -> %d 条" % (len(out), len(best)))
