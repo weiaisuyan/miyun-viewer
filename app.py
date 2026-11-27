@@ -2831,6 +2831,25 @@ def _todo_parse(ent):
     }
 
 
+def _todo_dedupe(items):
+    """同一件事在云端可能存了多条记录：只保留 lastModifiedTime 最新的那条。
+
+    实测依据（2026-11-27，以手机端为真值）：
+    「官方的」「很快就」各有两条，isFinish 一条 1 一条 0，lastModifiedTime 新的那条是完成的，
+    手机端显示已完成；x.com 两条都是未完成。所以「取最新一条」就能和手机完全对上。
+    """
+    best = {}
+    for it in items:
+        k = (it.get("title"), it.get("created"))
+        cur = best.get(k)
+        if cur is None:
+            best[k] = it
+            continue
+        if (it.get("mod") or 0, it.get("finished") or 0) > (cur.get("mod") or 0, cur.get("finished") or 0):
+            best[k] = it
+    return list(best.values())
+
+
 def _todo_fetch_all(min_at=0):
     """完整拉取全部代办（含已完成），翻页用 syncToken 游标。
 
@@ -2886,22 +2905,10 @@ def _todo_fetch_all(min_at=0):
             if nxt == token:
                 break
             token = nxt
-        # 去重：云端同一件事可能重复存在（createTime 一模一样、id 不同、状态还相反）。
-        # 实测（2026-11-27，手机端就是唯一真值）：
-        #   「官方的」「很快就」各有两条，isFinish 一条 1 一条 0，
-        #   手机端显示为已完成 —— 对应的是 lastModifiedTime 更新的那条（isFinish=1）。
-        # 所以规则是：同标题+同创建时间，只保留 lastModifiedTime 最新的那条，状态由它决定。
-        best = {}
-        for it in out:
-            k = (it["title"], it["created"])
-            cur = best.get(k)
-            if cur is None:
-                best[k] = it
-            elif (it["mod"], it["finished"]) > (cur["mod"], cur["finished"]):
-                best[k] = it
-        if len(best) != len(out):
-            print("[代办] 去重：%d -> %d 条" % (len(out), len(best)))
-        out = list(best.values())
+        n0 = len(out)
+        out = _todo_dedupe(out)
+        if len(out) != n0:
+            print("[代办] 去重：%d -> %d 条" % (n0, len(out)))
         out.sort(key=lambda x: (x["done"], -(x["created"] or 0)))
         TODO_CACHE.update({"at": time.time(), "items": out,
                            "maxId": max_id or None, "maxSort": max_sort or None,
@@ -2947,6 +2954,7 @@ def todo_sync():
     if not tok or not TODO_CACHE["items"]:
         return None, 0
     by_id = {str(x.get("id")): x for x in TODO_CACHE["items"]}
+    before_sig = sorted((str(x.get("id")), bool(x.get("done"))) for x in TODO_CACHE["items"])
     changed = 0
     token = tok
     last = tok
@@ -3026,8 +3034,11 @@ def todo_sync():
         except Exception as e:
             print("[代办] 首页兜底检查失败：%s %s" % (type(e).__name__, e))
     if changed:
-        out = list(by_id.values())
+        out = _todo_dedupe(list(by_id.values()))   # 增量合并回来的记录同样可能有重复
         out.sort(key=lambda x: (x["done"], -(x["created"] or 0)))
+        # 去重后如果最终列表没变，就不要当成「有变化」——否则每次切页签都会重写一遍 todos.dat
+        if sorted((str(x.get("id")), bool(x.get("done"))) for x in out) == before_sig:
+            changed = 0
         TODO_CACHE.update({"items": out,
                            "maxId": max_id or None,
                            "maxSort": max_sort or None})
