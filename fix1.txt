@@ -1,0 +1,6 @@
+ensure_login=True
+备份 D:\程序\小米云\backup\todo_google_20261128-230628.json（2 条）
+删除 14615871893733440 -> {"ok": true}
+标记完成 14610205857349728 -> {"ok": true, "done": true}
+复核：云端「谷歌ai费用」1 条，done=[True]
+DROP 还在吗: False

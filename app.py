@@ -3324,6 +3324,19 @@ def todo_toggle(tid, done):
         raise RuntimeError(res.get("reason") or res.get("description") or "更新失败")
     TODO_RAW.pop(tid, None)
     _todo_invalidate()
+    # 写完回读校验：以前只看接口返回 ok 就当成功，结果服务端状态没变、
+    # 界面却显示已勾，用户以为改好了。这里用一次增量同步把真实状态拉回来比对。
+    try:
+        todo_sync()
+        cur = next((x for x in (TODO_CACHE.get("items") or [])
+                    if str(x.get("id")) == tid), None)
+        if cur is not None and bool(cur.get("done")) != bool(done):
+            raise RuntimeError("服务端没有接受完成状态（仍是%s）"
+                               % ("已完成" if cur.get("done") else "未完成"))
+    except RuntimeError:
+        raise
+    except Exception:
+        pass          # 增量同步失败不影响本次结果，下次列表刷新会显示真实状态
     return {"ok": True, "done": bool(done)}
 
 

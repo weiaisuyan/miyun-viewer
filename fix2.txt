@@ -1,0 +1,4 @@
+ensure_login=True
+写之前: raw=3030 命中=1 done=[True]
+再次标记完成 -> {"ok": true, "done": true}
+写之后: raw=3030 命中=1 done=[True]
