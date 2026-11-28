@@ -3310,9 +3310,12 @@ def todo_toggle(tid, done):
     ent = dict(rec["contentJson"]["entity"])
     ent["assets"] = []
     now = int(time.time() * 1000)
+    # 服务端真正认的是 isFinish（0/1）。以前这里只写 markFinishTime + is_finish，
+    # is_finish 是反语义的废字段，结果「勾了完成」在手机/官方端根本没生效，
+    # 反而在云端多留了一条重复记录（2026-11-28 实测「谷歌ai费用」）。
+    ent["isFinish"] = 1 if done else 0
     ent["markFinishTime"] = now if done else 0
     ent["lastModifiedTime"] = now
-    ent["is_finish"] = bool(done)
     res = api_post_form("/todo/v1/user/records/%s/update" % tid, {
         "record": json.dumps({"type": "entity", "contentJson": ent},
                              ensure_ascii=False),
